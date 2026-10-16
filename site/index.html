@@ -2,104 +2,229 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OpenYAM playables</title>
-<meta name="description" content="Point your own AI assistant at the OpenYAM playable spec, ask for a robot-arm move, check it in the viewer, and bring the QR code to the arm at Edge City.">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f1">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14131a">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OpenYAM Playground</title>
+<meta name="description" content="Control the OpenYAM robot arm with your Claude: make a move or a dance in 3 steps, then bring it to the arm at Edge City.">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="alternate" type="text/plain" href="llms.txt" title="llms.txt">
-<script>try{var t=localStorage.getItem("theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
-<link rel="stylesheet" href="assets/site.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+/* Slideshow: full-height slides, horizontal scroll-snap (swipe on phones), dots + Next/Back, arrow keys. */
+:root{
+  --bg:#F3EFE8; --card:#FFFFFF; --ink:#1A1F24; --ink2:#5A6470; --line:#E2DCD2;
+  --accent:#F0611E; --accent-ink:#FFFFFF; --soft:#FCE6D9;
+  --display:'Bricolage Grotesque','Arial Narrow',system-ui,sans-serif;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#14171B;--card:#1E2328;--ink:#EEF0F2;--ink2:#A3ADB8;--line:#2E353C;--accent:#FF7A3D;--accent-ink:#14171B;--soft:#3A2418;color-scheme:dark}
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:400 17px/1.5 var(--sans);-webkit-font-smoothing:antialiased;overflow:hidden}
+.deck{height:100%;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scroll-behavior:smooth;scrollbar-width:none}
+.deck::-webkit-scrollbar{display:none}
+.slide{flex:0 0 100%;height:100%;scroll-snap-align:start;overflow-y:auto;display:flex;flex-direction:column;
+  padding:calc(24px + env(safe-area-inset-top,0px)) max(22px,env(safe-area-inset-right,0px)) calc(110px + env(safe-area-inset-bottom,0px)) max(22px,env(safe-area-inset-left,0px))}
+.inner{width:100%;max-width:560px;margin:auto;display:flex;flex-direction:column;gap:18px}
+.kicker{font:600 13px/1 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1,h2{font-family:var(--display);font-weight:800;letter-spacing:-0.03em;margin:0;text-wrap:balance;line-height:1.02}
+h1{font-size:clamp(40px,11vw,68px)}
+h2{font-size:clamp(32px,8.5vw,52px)}
+p{margin:0;color:var(--ink2);font-size:18px;max-width:46ch}
+p b{color:var(--ink)}
+.num{width:56px;height:56px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font:800 28px/1 var(--display)}
+.btn{appearance:none;border:0;border-radius:999px;background:var(--accent);color:var(--accent-ink);font:600 17px/1 var(--sans);padding:16px 26px;cursor:pointer;align-self:flex-start;text-decoration:none;display:inline-flex;gap:8px;align-items:center}
+.btn:focus-visible,input:focus-visible,.chip:focus-visible,a:focus-visible,.navbtn:focus-visible,.dot:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+label{font:600 14px/1 var(--sans);color:var(--ink2)}
+input{width:100%;font:500 18px/1.3 var(--sans);color:var(--ink);background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:14px 16px}
+.prompt{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:16px 18px;font:400 15.5px/1.55 var(--mono);color:var(--ink);overflow-wrap:anywhere}
+.prompt mark{background:var(--soft);color:var(--ink);border-radius:4px;padding:0 3px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.ok{font:500 14px var(--sans);color:var(--accent);min-height:1.2em}
+.chips{display:flex;flex-wrap:wrap;gap:10px}
+.chip{font:500 16px/1 var(--sans);color:var(--ink);background:var(--card);border:1.5px solid var(--line);border-radius:999px;padding:12px 16px;cursor:pointer}
+.chip:hover{border-color:var(--accent)}
+.note{font-size:15px;color:var(--ink2)}
+.note a,.links a{color:var(--ink);text-underline-offset:3px}
+.links{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:15px}
+.art{width:min(260px,62vw);height:auto;color:var(--ink)}
+.art .hl{color:var(--accent)}
+.examples{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ex{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:14px;background:var(--card);border:1.5px solid var(--line);text-decoration:none;color:var(--ink)}
+.ex:hover{border-color:var(--accent)}
+.ex b{font:700 18px/1.2 var(--display);letter-spacing:-0.01em}
+.ex span{font-size:14px;color:var(--ink2)}
+.ex i{font-style:normal;font:500 12px/1 var(--mono);color:var(--accent)}
+/* nav */
+.nav{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:14px max(22px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(22px,env(safe-area-inset-left,0px));
+  background:linear-gradient(to top,var(--bg) 70%,transparent)}
+.dots{display:flex;gap:8px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--line);border:0;padding:0;cursor:pointer}
+.dot[aria-current="true"]{background:var(--accent);width:26px;border-radius:6px}
+.navbtn{appearance:none;border:0;background:var(--ink);color:var(--bg);font:600 16px/1 var(--sans);padding:14px 22px;border-radius:999px;cursor:pointer}
+.navbtn.back{background:transparent;color:var(--ink2);padding:14px 6px}
+.navbtn[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){.deck{scroll-behavior:auto}}
+</style>
 </head>
-<body class="landing">
-<a class="skip" href="#main">Skip to content</a>
-<div class="wrap">
-  <header class="top">
-    <a href="./" class="brand" aria-current="page">
-      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="10" fill="var(--accent)"/><path d="M9 27h12" stroke="var(--accent-ink)" stroke-width="3" stroke-linecap="round"/><path d="M15 26V19l7-8 4 3" fill="none" stroke="var(--accent-ink)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15" cy="19" r="2.2" fill="var(--accent-ink)"/><circle cx="22" cy="11" r="2.2" fill="var(--accent-ink)"/></svg>
-      <span>OpenYAM playables<small>bring your own AI</small></span>
-    </a>
-    <nav class="nav" aria-label="Main">
-      <a href="viewer.html">Viewer</a>
-      <a href="spec/v1.md">Spec</a>
-      <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle light or dark theme" title="Light / dark">
-        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 3a7 7 0 0 1 0 14z" fill="currentColor"/></svg>
-      </button>
-    </nav>
-  </header>
+<body>
+<main class="deck" id="deck" aria-roledescription="slideshow">
 
-  <main id="main">
-    <section class="hero landing-hero">
-      <p class="eyebrow">A six-joint robot arm · Edge City lab</p>
-      <h1>Design a robot move with <em>your own AI</em>. Bring it to the arm.</h1>
-      <p class="lede">Point your AI assistant at our spec, ask for a move, check it in the viewer, and bring the QR code to the OpenYAM arm at Edge City. No sign-up, no keys: this site is just the spec, a viewer and a QR maker.</p>
-      <div class="row hero-actions">
-        <a class="btn btn-primary" href="#prompt">Copy the prompt</a>
-        <a class="btn btn-ghost" href="viewer.html">Open the viewer</a>
-      </div>
-    </section>
-
-    <ol class="flow" aria-label="How it works">
-      <li><span class="n">1</span><b>Point your AI at the spec</b><span>Any assistant that can read a web page: Claude, ChatGPT, Gemini, a local model.</span></li>
-      <li><span class="n">2</span><b>Ask for a move</b><span>“A slow bow”, “wave hello twice”, “dance to 120 bpm”. It writes a playable: keyframes of six joint angles.</span></li>
-      <li><span class="n">3</span><b>Check it in the viewer</b><span>See it move in 3D, run the same checks as the lab, fix what's red.</span></li>
-      <li><span class="n">4</span><b>Bring the QR to the arm</b><span>Show it at the Edge City lab. A person previews it and presses Play.</span></li>
-    </ol>
-
-    <section class="card prompt-card" id="prompt" aria-labelledby="prompt-title">
-      <h2 id="prompt-title">The prompt</h2>
-      <p class="muted">Type your idea, copy, and paste into your assistant.</p>
-      <label for="idea" class="prompt-label">Your idea</label>
-      <input id="idea" class="idea" type="text" maxlength="300" autocomplete="off" placeholder="e.g. a shy wave that ends with a little bow">
-      <div class="promptbox">
-        <p id="prompt-text" class="prompt-text">Read https://nhajela.github.io/openyam-playground/spec/v1.md and help me design a playable for the OpenYAM arm: <span id="idea-slot" class="slot">&lt;your idea&gt;</span>. Build the simulator from the spec so I can see it, validate it, then give me the JSON and an offline viewer link.</p>
-        <button id="copy-prompt" type="button" class="btn btn-primary">Copy prompt</button>
-      </div>
-      <p class="muted small">Assistants that can't run code can still write the JSON; paste it into the <a href="viewer.html">viewer</a> to see and check it.</p>
-    </section>
-
-    <section class="links" aria-labelledby="links-title">
-      <h2 id="links-title" class="sr-only">Links</h2>
-      <a class="tile link-tile" href="spec/v1.md"><b>Spec v1</b><small>The format, the limits, how validation works. Pinned: never changes meaning.</small></a>
-      <a class="tile link-tile" href="spec/latest.md"><b>Latest spec</b><small>Always the newest 1.x text.</small></a>
-      <a class="tile link-tile" href="llms.txt"><b>llms.txt</b><small>A short map of this site for AI assistants.</small></a>
-      <a class="tile link-tile" href="viewer.html"><b>Viewer</b><small>Paste JSON or a link: 3D replay, validator, QR.</small></a>
-      <a class="tile link-tile" href="viewer.html#examples-section" id="examples-link"><b>Examples</b><small>Nod, wave, a beat dance: load one in the viewer.</small></a>
-      <a class="tile link-tile" href="https://github.com/nhajela/openyam-playground"><b>GitHub</b><small>Source for this site, the validator port and the playground app.</small></a>
-    </section>
-
-    <div class="two">
-      <section class="card" aria-labelledby="lab-title">
-        <h2 id="lab-title">What happens at the lab</h2>
-        <ol class="steps">
-          <li>The station reads your QR (or JSON file) and checks the version.</li>
-          <li>It re-validates the motion with the lab's own Python validator: joint limits, speed and acceleration caps, a 60 s limit, and where the gripper tip goes.</li>
-          <li>It previews the motion on screen for the operator.</li>
-          <li>A human clears the space around the arm and presses Play. They may refuse anything, for any reason.</li>
-        </ol>
-        <p class="muted small">This viewer runs a faithful port of that validator, so “passes here” should mean “passes there”, but the lab's check is the one that counts.</p>
-      </section>
-      <section class="card" aria-labelledby="ver-title">
-        <h2 id="ver-title">Versioning promise</h2>
-        <ul class="steps">
-          <li>Every playable says <code>"format": "openyam-playable"</code> and <code>"version": "1.0"</code>.</li>
-          <li>Any <b>1.x</b> is accepted. Minor versions only add optional fields; unknown fields are ignored.</li>
-          <li>A different major version (2.0, …) is refused rather than guessed at.</li>
-          <li>No version at all? Read as a legacy 1.0 playable, with a note.</li>
-          <li>Optional <code>"caps"</code>: <code>"default"</code> (0.3 rad/s, 1.0 rad/s²) or <code>"dance"</code> (0.6 rad/s, 2.0 rad/s²).</li>
-        </ul>
-        <p class="muted small"><a href="spec/v1.md">spec/v1.md</a> is frozen; <a href="spec/latest.md">spec/latest.md</a> tracks the newest 1.x.</p>
-      </section>
+  <section class="slide" aria-label="Control the robot arm with your Claude">
+    <div class="inner">
+      <svg class="art" viewBox="0 0 260 170" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M40 160h120"/><path d="M80 160v-30"/><circle cx="80" cy="120" r="12"/>
+        <path d="M80 120 130 60"/><circle cx="130" cy="60" r="10"/><path d="M130 60l60 18"/>
+        <path class="hl" d="M190 78l18-14M190 78l20 8"/>
+        <path class="hl" stroke-width="6" d="M222 40c10 6 14 16 12 28M236 26c16 10 22 28 18 46"/>
+      </svg>
+      <div class="kicker">Edge City · OpenYAM arm</div>
+      <h1>Control the robot arm with your Claude.</h1>
+      <p>Describe a move or a dance. Your Claude makes it, shows it to you in 3D, and you bring it to the real arm. <b>3 steps, no code.</b></p>
+      <button class="btn" data-go="1">Show me how →</button>
     </div>
-  </main>
+  </section>
 
-  <footer class="foot">
-    OpenYAM playables. A static site: no server, no accounts, nothing you paste leaves your browser.
-    <a href="viewer.html">Viewer</a> · <a href="spec/v1.md">Spec v1</a> · <a href="llms.txt">llms.txt</a> · <a href="https://github.com/nhajela/openyam-playground">GitHub</a>
-  </footer>
-</div>
-<div id="sr-status" class="sr-only" role="status" aria-live="polite"></div>
-<script src="assets/landing.js" defer></script>
+  <section class="slide" aria-label="Step 1: Copy this into Claude">
+    <div class="inner">
+      <div class="num">1</div>
+      <h2>Copy this into Claude.</h2>
+      <label for="idea">What should the arm do?</label>
+      <input id="idea" type="text" maxlength="120" placeholder="do a little victory dance" autocomplete="off">
+      <div class="prompt" id="prompt">Read https://nhajela.github.io/openyam-playground/spec/v1.md and make a sequence for the OpenYAM robot arm: <mark id="slot">do a little victory dance</mark>. Show me a 3D simulation of it, check it follows the spec's safety rules, then give me the JSON and a QR code link to bring to the arm.</div>
+      <div class="row"><button class="btn" id="copy">Copy prompt</button><span class="ok" id="copied" role="status"></span></div>
+    </div>
+  </section>
+
+  <section class="slide" aria-label="Step 2: Watch it in 3D">
+    <div class="inner">
+      <div class="num">2</div>
+      <h2>Watch it move in 3D.</h2>
+      <p>Your Claude writes the moves and builds a little simulator, so you see the arm dance before it's real.</p>
+      <p>Want changes? Just ask: <b>"slower"</b>, <b>"bigger"</b>, <b>"end with a wave"</b>, <b>"make it match this song"</b>.</p>
+      <p class="note">You can also paste the result into our <a href="viewer.html">viewer</a> to check it.</p>
+    </div>
+  </section>
+
+  <section class="slide" aria-label="Step 3: Bring it to the arm">
+    <div class="inner">
+      <div class="num">3</div>
+      <h2>Bring it to the arm.</h2>
+      <p>Ask Claude for the <b>QR code</b> and show it at the robot table. We check it's safe and press play.</p>
+      <p class="note">Every move is checked again at the arm against its safe range and speed limits before a person presses play. If something's off, we'll tell you what to change.</p>
+    </div>
+  </section>
+
+  <section class="slide" aria-label="Moves the arm already knows">
+    <div class="inner">
+      <h2>Moves it already knows.</h2>
+      <p>Tap one to watch it in 3D, or ask your Claude to remix it. Most of these already ran on the real arm at Edge City.</p>
+      <div class="examples" id="examples"></div>
+    </div>
+  </section>
+
+  <section class="slide" aria-label="Need an idea?">
+    <div class="inner">
+      <h2>Need an idea?</h2>
+      <p>Tap one, then copy the prompt.</p>
+      <div class="chips" id="ideas">
+        <button class="chip">wave hello to the crowd</button>
+        <button class="chip">do a little victory dance</button>
+        <button class="chip">take a bow</button>
+        <button class="chip">nod yes three times</button>
+        <button class="chip">look around curiously</button>
+        <button class="chip">sway like it's at a concert</button>
+        <button class="chip">do a bhangra shoulder bounce</button>
+      </div>
+      <div class="links"><a href="viewer.html">Viewer</a><a href="spec/v1.md">The spec (for the curious)</a><a href="https://github.com/Nhajela/openyam-playground">GitHub</a></div>
+    </div>
+  </section>
+
+</main>
+
+<nav class="nav" aria-label="Slides">
+  <button class="navbtn back" id="back" hidden>← Back</button>
+  <div class="dots" id="dots"></div>
+  <button class="navbtn" id="next">Next →</button>
+</nav>
+
+<script>
+(function () {
+  // Real sequences from the lab, as self-contained viewer links (#p = base64url(zlib({"v":1,"playable":...}))).
+  var EXAMPLES = [{"title":"Nod","desc":"yes, yes, yes","len":"9.8 s \u00b7 ran on the arm","p":"eNqVkcFqwzAMhl_F-LQx1zhpkqa57QHGLr2M0YOSqK3bxPYctyOUvvvkbowNukEwBv-SPv0SPvMTrxLBXQcj1B3y6sw31vcQeMWtQzNCP_tOCn5CP2hrKJlIRdpATww3to3CBhxIrXQXWNgh24Fp2d0-u2dHx-K7hubAWvtuKO0RWdA9DoJ1-oCMerTabCU1gmPYWU-dnmmCl8cn1kFN4cYjBGwpnqq0mCVqlhSrJKuyRZWWDyqv5nGkwUETZ9pbbULUAXzchuB2JN1Z6647Dw5jM1pE8AOOG0-70PivZ07lFHujtxJK5nRLoeJZC7712l3TCEO0aY61bvhFfFKyzH-AkVzSVfkXfItJZXoDmf9DzGPZRJeMSqa5FDKd7LKQxUSXUi4nuyzpO_74nd_l68vlA_X5yUo"},{"title":"Wave","desc":"hello to the crowd","len":"11.7 s \u00b7 ran on the arm","p":"eNqdkU1PwzAMhv9KlCtplHRrt_XGHcSFC0I7uK3HAm1TkmxTNe2_45QJhNiQqKo08Ws__kiOfM8LLXjfwABlg7w48o11LQRecNtjN0CbfDkF36Pzxnbk1FKR3UFLDD_APno7G9CTeWc2gYUtMkqF4FoRjY75AwyjXIJHBl3NnG2aUTk44wPzpkYW7HnfOqS_adFLyg27sLWOkj9QV0-396yBkuSKCgSsSU9VmidaJTp_1PNivijS5Y3Kills0_dQxT5frelCtAO4OCHB9UB2Y20_3oPvMSaj4QR_w2HjaD6a6PnIKZy0dzoroWRGaylU_NaCvzjTj26kwShttStNxU9ipLTMs29wIbTUIlFydmYvIanMz4RUy1-Q1OkVbiZXn1xyCUz-IDOZTqqYy2xixQXd35SKK4qaVlET8N-X0Jrirrz6z_j16fQBAEXkpA"},{"title":"Bow","desc":"a polite bow","len":"8.4 s \u00b7 new","p":"eNqFkE1PwzAMhv-KlRNIWZTuA0Fvk7jCLkgIoR3S1lsz2rgk6aYy7b_jVNsQXFAUya_92PGbo9iLPJOia8xgigZFfhQb8q2JIhfUoRtMO7kWpdijD5YcFzOlWTvTco8o6JAERQysluDRNMDJHBo0DmKNEGrqmwo98PiD8RXc7KbQd7cSCnTViNSGg4oOjmtzcLg10e6RiZqaSoK3ARW8MBhtB1vCcJ2VGh9Xr8-w8dTCF2g1n0ELkTiaZtAq3s70sSbP663Y1tvyCUKHJedDZ8rkYUfWxaSj8ck9e6gG1g1RN_4R81iN0QcOG8_O2ez7UTCspfjkWEutFnzvpU5nLcXWW27WJzliMzW_gJnKGHyQE63uziyakPYo-8KW4tyx-J9Pn3PB738e-LvJ7-nr0-kb0TCVwA"},{"title":"Happy dance","desc":"a little wiggle","len":"10.9 s \u00b7 ran on the arm","p":"eNqtUtFqwyAU_RXxdSqaNmmat33AGIy9jNGHm8Qubml0altC6b_vmpVtDAZdKRL0nus5557gge5opRh1PYxQ95pWB7q2fgORVtQ6PYyw4V9NRnfaB2MHbCohsR5ggxzagXMjb2Fo0qXBRh0QfejG2G1MQ4JpNY-Wp52EPYzErkkNQRMYWrL3JkSyN7EjQHoTY69JbbeoNbVfvHFOexIGcEGgPGxjZz3q3-N8T7d3pIca4cZriLpFPJNZwZXkqnhU82q-qLLyRubVLA0cHDRp4ldrhpjqCD5lRXI7Yt1b66Y_EpxOYhiT0Tc9rj0mxVDPB4rXEXvHs2RS5PiVTKa1YjQNO7U1pkPZZlubhh7ZxFIi--YVTJ3HyoTMTzQhy8TMmUonjnXBTqD6lkHpP4SWF9jPxOJkz3_5T_afID9rgHlq_HuAXMyvk78QswvsF0JdK395gX0pyuukX4rFBfZK_nw0Z7311fH4AVQsLJ8"},{"title":"Beat dance","desc":"52 beats at 100 BPM","len":"31.2 s \u00b7 ran on the arm","p":"eNqllMGO2yAQhl8FcWpVQIBjJ7HUQ6teV-2hl6raA7bZ1q0N1OBdWVHevUMqR97NSnGoLMtm4ONn_gEO-BGXgmDXqUlVncblAT_YoVcBl9g6bSbV03MnwY968K010CkYh7ZRPTC40irQRpk6jjE2aA_BXKIY90gFJDhHH7_coTfW6FMUvUecFci_LVFtRxNoa5CxjSfIP6mJIDf2Lv5rDZ-nofUBDbbroH901LeNBqyvLEOfoiqqlfMMtNUYftoBxD_D2r99uEOdqiBcDyCpG4hLLgsqOBXFV5GXclNm4h3Pyywm452qYza_bGtCbAc1RB8AbqY4C4hAc86zs9adzPNOx7nBEYJ_6-lhAFNg4PcDBhpif-CfE85yeHeEx-ee4B9D607dWvmoWo9VW-Mj-Uex4oJjYg0pmExSFDAwTVGyTZJids6RSfkMpTFyDd_MC6YX_Br8v7S3s8lp2rulY7ucxJrFmda4tn9lZ6yqL18W-EZRkbinNudE2X6JQvg6vF-YvKTpKlzyWRvGF9v8ZZGu8mI2OurlF3vkKi-f7c_b9dMOlczP5z-W9mWhV-gWC98uZ1iV-nZxspPWsFt6l7SGLO3ezV6_eFcdkuz2q_f-ePwLx0T4qQ"},{"title":"Range tour","desc":"how far it reaches","len":"25.3 s \u00b7 ran on the arm","p":"eNqdkcFugzAMQH8lyrUhTUKhHbdJu06Tpl2mqQcDaWELhIXQClX99zndWrU3OqFIsc3zM-ZAdzSTjHYGRsiNptmBbqxrwNOM2k63IzTRpcjoTru-ti0WJRcYt9AgQ51tInBNSFive8y8QrvVkd1EjfUIEG8Hl5Eceo1XMptHyBMHJSN9ZQdTajfXJrd74sEYRnylWwIER9mDK0nvnfZFxckTtIUmBXQ9RxkMvrIObS846fvjMzGQY7pwGrwuMa-ESiMpIpm-ySRTiyyWM5FkcRi976AIs3_auvUh9uDCVyNcjqELSjAsgxFDY213WlXf6dAb52f0S48bhyvAFz8OFGnMfeNdMMETPCsmwrNmdOvq7lTWuAJsWwx5XdAjO1GKL5NfUN4HxjyeDFbWlGduxVd_XHSn8YEvppPXSqm4-tdyEFxNBW-EKU-TMyhRHgaYZlxyNZm8VqrL7w_ERJsSPJ2G3agSrpbJnQtdH48_KMoV0A"}];
+  var exBox = document.getElementById("examples");
+  EXAMPLES.forEach(function (e) {
+    var a = document.createElement("a");
+    a.className = "ex"; a.href = "viewer.html#p=" + e.p;
+    a.innerHTML = "<b></b><span></span><i></i>";
+    a.querySelector("b").textContent = e.title;
+    a.querySelector("span").textContent = e.desc;
+    a.querySelector("i").textContent = e.len;
+    exBox.appendChild(a);
+  });
+
+  var deck = document.getElementById("deck");
+  var slides = Array.prototype.slice.call(deck.querySelectorAll(".slide"));
+  var dots = document.getElementById("dots"), back = document.getElementById("back"), next = document.getElementById("next");
+  var cur = 0;
+  slides.forEach(function (s, i) {
+    s.setAttribute("aria-roledescription", "slide");
+    var d = document.createElement("button");
+    d.className = "dot"; d.setAttribute("aria-label", "Slide " + (i + 1) + ": " + s.getAttribute("aria-label"));
+    d.onclick = function () { go(i); };
+    dots.appendChild(d);
+  });
+  function go(i) {
+    i = Math.max(0, Math.min(slides.length - 1, i));
+    deck.scrollTo({ left: i * deck.clientWidth });
+  }
+  function update() {
+    cur = Math.round(deck.scrollLeft / Math.max(1, deck.clientWidth));
+    Array.prototype.forEach.call(dots.children, function (d, i) { d.setAttribute("aria-current", i === cur ? "true" : "false"); });
+    back.hidden = cur === 0;
+    next.textContent = cur === slides.length - 1 ? "Start over" : "Next →";
+  }
+  deck.addEventListener("scroll", function () { window.requestAnimationFrame(update); }, { passive: true });
+  window.addEventListener("resize", function () { go(cur); });
+  next.onclick = function () { go(cur === slides.length - 1 ? 0 : cur + 1); };
+  back.onclick = function () { go(cur - 1); };
+  document.addEventListener("keydown", function (e) {
+    if (e.target && e.target.tagName === "INPUT") return;
+    if (e.key === "ArrowRight") go(cur + 1);
+    if (e.key === "ArrowLeft") go(cur - 1);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-go]"), function (b) {
+    b.onclick = function () { go(+b.getAttribute("data-go")); };
+  });
+
+  var idea = document.getElementById("idea"), slot = document.getElementById("slot"), prompt = document.getElementById("prompt");
+  var DEFAULT = "do a little victory dance";
+  function sync() { slot.textContent = idea.value.trim() || DEFAULT; }
+  idea.addEventListener("input", sync);
+  Array.prototype.forEach.call(document.querySelectorAll("#ideas .chip"), function (c) {
+    c.onclick = function () { idea.value = c.textContent; sync(); go(1); };
+  });
+  var copied = document.getElementById("copied");
+  document.getElementById("copy").onclick = function () {
+    var text = prompt.textContent.replace(/\s+/g, " ").trim();
+    function done(msg) { copied.textContent = msg; setTimeout(function () { copied.textContent = ""; }, 3000); }
+    function fallback() {
+      var r = document.createRange(); r.selectNodeContents(prompt);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      done("Selected. Copy it and paste it into Claude.");
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done("Copied. Paste it into Claude."); }, fallback);
+    } else fallback();
+  };
+  update();
+})();
+</script>
 </body>
 </html>
