@@ -19,10 +19,16 @@ export function hashIp(ip: string): string {
   return createHash("sha256").update(`${salt}:${ip}`).digest("hex").slice(0, 32);
 }
 
+/**
+ * Client IP for rate limiting. Prefer X-Real-IP (set by Traefik/Coolify and Vercel), else the
+ * LAST X-Forwarded-For entry (the one our proxy appended; earlier entries are client-controlled).
+ */
 export function clientIp(headers: Headers): string {
+  const real = headers.get("x-real-ip");
+  if (real) return real.trim();
   const xff = headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  return headers.get("x-real-ip") || headers.get("cf-connecting-ip") || "unknown";
+  if (xff) return xff.split(",").map((s) => s.trim()).filter(Boolean).pop() || "unknown";
+  return "unknown";
 }
 
 export function baseUrl(headers: Headers): string {

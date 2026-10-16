@@ -1,5 +1,5 @@
 import { GEMINI_SCHEMA } from "../schema";
-import { LLMError, parseJsonLoose, type LLMProvider } from "../types";
+import { LLMError, parseJsonLoose, timeoutSignal, type LLMProvider } from "../types";
 
 /**
  * Gemini on Vertex AI with an API key (the deploy key is a Vertex key that is blocked on
@@ -30,7 +30,7 @@ export function geminiProvider(env = process.env, fetchImpl: typeof fetch = fetc
           contents: [{ role: "user", parts: [{ text: user }] }],
           generationConfig: { responseMimeType: "application/json", responseSchema: GEMINI_SCHEMA, temperature: 0.7, maxOutputTokens: 8192 },
         }),
-        signal: AbortSignal.timeout(90_000),
+        signal: timeoutSignal(90_000),
       }).catch((e: Error) => { throw new LLMError(`Gemini request failed: ${e.message}`); });
       const body = await res.text();
       if (!res.ok) throw new LLMError(`Gemini (Vertex) error ${res.status}: ${body.slice(0, 300)}`);

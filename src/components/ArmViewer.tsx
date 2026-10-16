@@ -126,6 +126,7 @@ export default function ArmViewer({ playable, autoPlay = true, loop = false, lab
     const trailGeo = new THREE.BufferGeometry();
     const trailMat = new THREE.LineBasicMaterial({ transparent: true, opacity: 0.8 });
     const trail = new THREE.Line(trailGeo, trailMat);
+    trail.frustumCulled = false; // geometry changes per playable
     world.add(trail);
 
     const up = new THREE.Vector3(0, 1, 0);
@@ -176,6 +177,7 @@ export default function ArmViewer({ playable, autoPlay = true, loop = false, lab
     }
     function setTrail(p: Vec3[]) {
       trailGeo.setFromPoints(p.map(toV));
+      trailGeo.computeBoundingSphere();
     }
 
     applyTheme(isDark());

@@ -20,3 +20,11 @@ export function parseJsonLoose(text: string): unknown {
     throw new LLMError(`model output is not valid JSON: ${(e as Error).message}`);
   }
 }
+
+/** Abort signal that fires after `ms` without keeping the process alive. */
+export function timeoutSignal(ms: number): AbortSignal {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(new Error(`timed out after ${ms / 1000}s`)), ms) as unknown as { unref?: () => void };
+  t.unref?.();
+  return c.signal;
+}

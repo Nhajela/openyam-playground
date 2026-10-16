@@ -62,3 +62,12 @@ describe("ids, rate limit, store", () => {
     expect(SCHEMA_SQL).toBe(readFileSync("migrations/001_init.sql", "utf8"));
   });
 });
+
+import { clientIp } from "@/lib/ids";
+describe("clientIp", () => {
+  it("prefers x-real-ip, else the proxy-appended last x-forwarded-for entry", () => {
+    expect(clientIp(new Headers({ "x-real-ip": "9.9.9.9", "x-forwarded-for": "1.1.1.1, 2.2.2.2" }))).toBe("9.9.9.9");
+    expect(clientIp(new Headers({ "x-forwarded-for": "1.1.1.1, 2.2.2.2" }))).toBe("2.2.2.2");
+    expect(clientIp(new Headers())).toBe("unknown");
+  });
+});

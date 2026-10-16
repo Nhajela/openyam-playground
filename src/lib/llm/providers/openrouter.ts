@@ -1,5 +1,5 @@
 import { PLAYABLE_SCHEMA } from "../schema";
-import { LLMError, parseJsonLoose, type LLMProvider } from "../types";
+import { LLMError, parseJsonLoose, timeoutSignal, type LLMProvider } from "../types";
 
 /**
  * OpenRouter (OpenAI-compatible chat completions, https://openrouter.ai/api/v1).
@@ -23,7 +23,7 @@ export function openrouterProvider(env = process.env, fetchImpl: typeof fetch = 
         response_format: format,
         max_tokens: 8000,
       }),
-      signal: AbortSignal.timeout(90_000),
+      signal: timeoutSignal(90_000),
     }).catch((e: Error) => { throw new LLMError(`OpenRouter request failed: ${e.message}`); });
     return { status: res.status, body: await res.text() };
   };
