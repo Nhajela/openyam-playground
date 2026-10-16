@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenYAM Simulator</title>
+<!-- OpenYAM playables v1 reference simulator. Single file; three libraries from cdnjs, pinned.
+     Spec: https://nhajela.github.io/openyam-playground/spec/v1.md (section 12). -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+  :root { --bg:#f7f5f1; --panel:#ffffff; --ink:#1d1b22; --muted:#6b6776; --line:#ddd7cc;
+          --ok:#1d7a46; --bad:#c03030; --accent:#e8601c; --link:#2f6fec; --code:#f0ece4; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#16151b; --panel:#201e27; --ink:#ecebf0; --muted:#a19dad; --line:#383544;
+            --ok:#5fd08d; --bad:#ff7a7a; --accent:#ff8a4c; --link:#86adff; --code:#2a2833; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui, sans-serif; }
+  header { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  header span { color:var(--muted); font-size:13px; }
+  main { display:grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); gap:16px; padding:16px; }
+  @media (max-width: 860px) { main { grid-template-columns: minmax(0,1fr); } }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; min-width:0; }
+  #view { width:100%; height:420px; border-radius:8px; overflow:hidden; touch-action:none; cursor:grab; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+  button, select, input[type=file] { font:inherit; }
+  button { background:var(--ink); color:var(--bg); border:0; border-radius:6px; padding:6px 12px; cursor:pointer; }
+  button.secondary { background:transparent; color:var(--ink); border:1px solid var(--line); }
+  input[type=range] { flex:1; min-width:120px; }
+  textarea { width:100%; height:220px; font:12px/1.4 ui-monospace, monospace; background:var(--code); color:var(--ink);
+             border:1px solid var(--line); border-radius:6px; padding:8px; }
+  .mono { font-family: ui-monospace, monospace; font-size:12px; }
+  #status { font-weight:700; }
+  #status.ok { color:var(--ok); } #status.bad { color:var(--bad); }
+  #violations { margin:6px 0 0; padding-left:18px; max-height:220px; overflow:auto; }
+  #violations li { margin:2px 0; }
+  #qr img { width:min(100%, 320px); height:auto; background:#fff; padding:6px; border-radius:6px; }
+  #link { word-break:break-all; color:var(--link); }
+  .muted { color:var(--muted); font-size:13px; }
+  table { border-collapse:collapse; font-size:12px; }
+  td, th { padding:2px 6px; text-align:right; border-bottom:1px solid var(--line); }
+</style>
+</head>
+<body>
+<header><h1>OpenYAM playable simulator</h1><span>reference implementation of spec v1.0.0: same interpolation and validator as the lab</span></header>
+<main>
+  <section>
+    <div id="view"></div>
+    <div class="row">
+      <button id="play">Pause</button>
+      <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="time">
+      <span id="time" class="mono">0.00 / 0.00 s</span>
+    </div>
+    <div class="row mono">
+      <span>tip (m): <b id="tip">-</b></span>
+      <span>tip height: <b id="tipz">-</b></span>
+      <span>q: <span id="q">-</span></span>
+    </div>
+    <p class="muted">Drag to orbit, wheel or pinch to zoom. Orange dot = gripper tip, blue line = tip path,
+      faint disc = 0.08 m tip safety height, grey arrow = +x (forward).</p>
+  </section>
+  <section>
+    <div class="row" style="margin-top:0">
+      <input id="file" type="file" accept=".json,application/json">
+      <button id="apply">Load JSON from box</button>
+    </div>
+    <textarea id="json" spellcheck="false" aria-label="playable JSON"></textarea>
+    <div class="row"><span>Validation: <span id="status">-</span></span><span id="summary" class="muted"></span></div>
+    <ul id="violations" class="mono"></ul>
+    <div id="stats" class="mono"></div>
+    <div class="row">
+      <button id="download" class="secondary">Download JSON</button>
+      <button id="makelink" class="secondary">Make offline link + QR</button>
+    </div>
+    <div id="qr"></div>
+    <div id="link" class="mono"></div>
+  </section>
+</main>
+<script>
+"use strict";
+// =====================================================================================
+// 1. Constants (spec sections 4-6). Joint order j1..j6, radians.
+// =====================================================================================
+const FORMAT = "openyam-playable", SUPPORTED_MAJOR = 1;
+const JOINTS = ["j1", "j2", "j3", "j4", "j5", "j6"];
+const URDF_LIMITS = [[-2.618, 3.142], [0.0, 3.665], [0.0, 3.142], [-1.693, 1.571], [-1.571, 1.571], [-2.094, 2.094]];
+const MARGIN = 0.1;
+const SOFT = URDF_LIMITS.map(([lo, hi]) => [lo + MARGIN, hi - MARGIN]);
+const CAP_PRESETS = { default: [0.3, 1.0], dance: [0.6, 2.0] }; // [vel rad/s, acc rad/s^2]
+const GRIP_VEL_CAP = 3.0;
+const POSES = { home: [0, 0, 0, 0, 0, 0], ready: [0, 0.5, 0.8, 0, 0, 0] };
+const RATE_HZ = 100, DT = 1 / RATE_HZ, MAX_DURATION_S = 60, START_TOL = 0.05, LOOP_TOL = 0.01;
+const EASES = ["linear", "cubic", "hold"];
+const NAME_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+const VIEWER = "https://nhajela.github.io/openyam-playground/viewer.html";
+const MIN_TIP_Z = 0.08, MIN_LINK_Z = 0.03, MIN_TIP_X = -0.10;
+
+const isNum = (x) => typeof x === "number" && Number.isFinite(x);
+const round = (x, n) => Number(x.toFixed(n)); // correctly rounded like Python's round() except exact ties
+const maxAbsDiff = (a, b) => Math.max(...a.map((x, i) => Math.abs(x - b[i])));
+const V = (kind, msg, o = {}) => ({ kind, msg, joint: null, t: null, t_play: null, value: null, limit: null, ...o });
+
+// =====================================================================================
+// 2. Parsing (spec 7.1-7.3)
+// =====================================================================================
+function compat(p) {
+  const fmt = p.format, ver = p.version;
+  if (fmt === undefined && ver === undefined) return [true, "legacy (no format/version), treated as 1.0"];
+  if (fmt !== FORMAT) return [false, `format ${JSON.stringify(fmt)} is not "${FORMAT}"`];
+  if (typeof ver !== "string" || !/^\d+\.\d+$/.test(ver)) return [false, `version ${JSON.stringify(ver)} must be a 'MAJOR.MINOR' string, e.g. '1.0'`];
+  if (parseInt(ver.split(".")[0], 10) !== SUPPORTED_MAJOR) return [false, `version ${ver} not supported: this lab reads ${SUPPORTED_MAJOR}.x`];
+  return [true, `${FORMAT} ${ver}`];
+}
+
+function parse(p) {
+  const v = [], keys = [];
+  const bad = (msg, t = null, kind = "schema") => v.push(V(kind, msg, { t }));
+  if (typeof p.name !== "string" || !NAME_RE.test(p.name)) bad(`name ${JSON.stringify(p.name)} must match ${NAME_RE.source}`);
+  const space = p.space === undefined ? "joint" : p.space;
+  if (space === "cartesian") bad("space 'cartesian' is parsed but not supported yet; use 'joint'", null, "unsupported");
+  else if (space !== "joint") bad(`space must be 'joint' or 'cartesian', got ${JSON.stringify(space)}`);
+  const start = p.start === undefined ? "ready" : p.start;
+  if (!Object.prototype.hasOwnProperty.call(POSES, start)) bad(`start ${JSON.stringify(start)} is not a named pose (home, ready)`);
+  const loop = p.loop === undefined ? 1 : p.loop;
+  if (!Number.isInteger(loop) || loop < 1 || loop > 10) bad(`loop must be an integer 1..10, got ${JSON.stringify(loop)}`);
+  const speed = p.speed === undefined ? 1 : p.speed;
+  if (!isNum(speed) || !(speed > 0 && speed <= 2)) bad(`speed must be a number in (0, 2], got ${JSON.stringify(speed)}`);
+  const kfs = p.keyframes;
+  if (!Array.isArray(kfs) || kfs.length === 0) { bad("keyframes must be a non-empty list"); return [keys, v]; }
+  if (kfs.length < 2) bad("keyframes needs at least 2 entries (the lab cannot play a single keyframe)");
+  let grip = 0;
+  kfs.forEach((k, i) => {
+    if (!k || typeof k !== "object" || Array.isArray(k)) { bad(`keyframe ${i} is not an object`); return; }
+    const t = k.t, q = k.q;
+    if (!isNum(t)) { bad(`keyframe ${i}: t must be a number`); return; }
+    if (!Array.isArray(q) || q.length !== 6 || !q.every(isNum)) { bad(`keyframe ${i} (t=${t}): q must be a list of 6 numbers (rad)`, t); return; }
+    if (k.grip !== undefined && k.grip !== null) {
+      if (!isNum(k.grip) || k.grip < 0 || k.grip > 1) { bad(`keyframe ${i} (t=${t}): grip must be 0..1, got ${JSON.stringify(k.grip)}`, t); return; }
+      grip = k.grip;
+    }
+    let ease = k.ease === undefined ? "cubic" : k.ease;
+    if (!ease) ease = "cubic"; // null, "" -> cubic
+    if (!EASES.includes(ease)) { bad(`keyframe ${i} (t=${t}): ease must be one of linear, cubic, hold, got ${JSON.stringify(ease)}`, t); ease = "cubic"; }
+    keys.push({ t, q: q.slice(), grip, ease });
+  });
+  if (keys.length && Math.abs(keys[0].t) > 1e-9) bad(`first keyframe must be at t=0, got t=${keys[0].t}`, keys[0].t);
+  for (let i = 1; i < keys.length; i++)
+    if (keys[i].t <= keys[i - 1].t)
+      v.push(V("non_monotonic_t", `keyframe t=${keys[i].t} is not after previous t=${keys[i - 1].t}`, { t: keys[i].t, value: keys[i].t, limit: keys[i - 1].t }));
+  return [keys, v];
+}
+
+// =====================================================================================
+// 3. Timeline, easing, sampling (spec 6)
+// =====================================================================================
+function transitionDuration(q0, q1, [vcap, acap]) {
+  const d = q0.map((a, i) => Math.abs(q1[i] - a));
+  const vel = vcap * 0.5, acc = acap * 0.5;
+  const T = Math.max(Math.max(...d.map((x) => 1.5 * x / vel)), Math.max(...d.map((x) => Math.sqrt(6 * x / acc))), 0.5);
+  return round(T + 0.05, 2);
+}
+
+function timeline(p, caps) {
+  const [keys, viol] = parse(p);
+  if (!keys.length || viol.some((x) => ["schema", "non_monotonic_t", "unsupported"].includes(x.kind))) return [[], null, viol];
+  const speed = p.speed === undefined ? 1 : p.speed, loops = p.loop === undefined ? 1 : p.loop;
+  const startName = p.start === undefined ? "ready" : p.start, startQ = POSES[startName];
+  const segs = [];
+  let t = 0, transition = null;
+  const gap0 = maxAbsDiff(keys[0].q, startQ);
+  if (gap0 > START_TOL) {
+    const T = transitionDuration(startQ, keys[0].q, caps);
+    segs.push({ t0: 0, t1: T, q0: startQ, q1: keys[0].q, g0: keys[0].grip, g1: keys[0].grip, ease: "cubic", authored_t0: null, speed: 1, label: "transition from start pose" });
+    transition = { from: startName, duration: T, max_delta: gap0 };
+    t = T;
+  }
+  for (let L = 0; L < loops; L++) {
+    if (L > 0) {
+      const gap = maxAbsDiff(keys[keys.length - 1].q, keys[0].q);
+      if (gap > LOOP_TOL) {
+        viol.push(V("loop_discontinuity", `loop=${loops} but the last keyframe differs from the first by ${gap.toFixed(3)} rad; make them equal`, { t: keys[keys.length - 1].t, value: gap, limit: LOOP_TOL }));
+        return [segs, transition, viol];
+      }
+    }
+    for (let i = 1; i < keys.length; i++) {
+      const a = keys[i - 1], b = keys[i], dt = (b.t - a.t) / speed;
+      segs.push({ t0: t, t1: t + dt, q0: a.q, q1: b.q, g0: a.grip, g1: b.grip, ease: b.ease, authored_t0: a.t, speed, label: `loop ${L + 1}: keyframe ${i - 1}->${i} (t ${a.t}->${b.t})` });
+      t += dt;
+    }
+  }
+  return [segs, transition, viol];
+}
+
+function shape(ease, s) {
+  if (ease === "linear") return s;
+  if (ease === "hold") return s >= 1 ? 1 : 0;
+  return s * s * (3 - 2 * s); // cubic = smoothstep
+}
+
+function segIndex(segs, t) { // bisect_right(starts, t) - 1, clipped
+  let lo = 0, hi = segs.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (t < segs[m].t0) hi = m; else lo = m + 1; }
+  return Math.min(Math.max(lo - 1, 0), segs.length - 1);
+}
+
+function evalAt(segs, t) {
+  const i = segIndex(segs, t), sg = segs[i], span = sg.t1 - sg.t0;
+  const s = span <= 0 ? 1 : Math.min(Math.max((t - sg.t0) / span, 0), 1);
+  const w = shape(sg.ease, s);
+  return { q: sg.q0.map((a, j) => a + w * (sg.q1[j] - a)), grip: sg.g0 + w * (sg.g1 - sg.g0), i };
+}
+
+function sampleSegs(segs) {
+  const D = segs[segs.length - 1].t1, n = Math.floor(D * RATE_HZ + 1e-9);
+  const ts = [];
+  for (let k = 0; k <= n; k++) ts.push(k / RATE_HZ);
+  if (ts[ts.length - 1] < D - 1e-9) ts.push(D);
+  const Q = [], G = [], idx = [];
+  for (const t of ts) { const e = evalAt(segs, t); Q.push(e.q); G.push(e.grip); idx.push(e.i); }
+  return { ts, Q, G, idx };
+}
+
+function gradient(f, x) { // numpy.gradient(f, x): non-uniform 2nd order interior, 1st order edges
+  const n = f.length, out = new Array(n).fill(0);
+  out[0] = (f[1] - f[0]) / (x[1] - x[0]);
+  out[n - 1] = (f[n - 1] - f[n - 2]) / (x[n - 1] - x[n - 2]);
+  for (let i = 1; i < n - 1; i++) {
+    const h1 = x[i] - x[i - 1], h2 = x[i + 1] - x[i];
+    out[i] = (-h2 / (h1 * (h1 + h2))) * f[i - 1] + ((h2 - h1) / (h1 * h2)) * f[i] + (h1 / (h2 * (h1 + h2))) * f[i + 1];
+  }
+  return out;
+}
+
+function runs(mask) {
+  const out = [];
+  for (let i = 0; i < mask.length; i++) if (mask[i]) { let j = i; while (j + 1 < mask.length && mask[j + 1]) j++; out.push([i, j]); i = j; }
+  return out;
+}
+
+// =====================================================================================
+// 4. Validator (spec 7). Same checks, order and tolerances as the lab.
+// =====================================================================================
+function validate(p) {
+  if (!p || typeof p !== "object" || Array.isArray(p)) return { ok: false, duration: null, violations: [V("schema", "playable must be a JSON object")] };
+  const [cok, note] = compat(p);
+  if (!cok) return { ok: false, duration: null, transition: null, violations: [V("version", note, { value: p.version ?? null })] };
+  const preset = p.caps === undefined ? "default" : p.caps;
+  if (typeof preset !== "string" || !Object.prototype.hasOwnProperty.call(CAP_PRESETS, preset))
+    return { ok: false, duration: null, transition: null, violations: [V("schema", `unknown caps preset ${JSON.stringify(preset)}`, { value: preset })] };
+  const caps = CAP_PRESETS[preset], [vcap, acap] = caps;
+  const [segs, transition, viol] = timeline(p, caps);
+  const res = { ok: false, violations: viol, duration: null, transition, caps: preset };
+  if (!segs.length) return res;
+  const [keys] = parse(p);
+  const lo = SOFT.map((x) => x[0]), hi = SOFT.map((x) => x[1]);
+  const startQ = POSES[p.start === undefined ? "ready" : p.start];
+
+  keys.forEach((k, i) => k.q.forEach((x, j) => {
+    if (x < lo[j] || x > hi[j]) {
+      const lim = x < lo[j] ? lo[j] : hi[j];
+      viol.push(V("keyframe_out_of_range", `keyframe ${i} (t=${k.t}): ${JOINTS[j]} ${x.toFixed(3)} ${x < lo[j] ? "<" : ">"} soft limit ${lim.toFixed(3)}`, { t: k.t, joint: JOINTS[j], value: round(x, 4), limit: round(lim, 4) }));
+    }
+  }));
+  for (let i = 1; i < keys.length; i++) if (keys[i].ease === "hold") {
+    const d = maxAbsDiff(keys[i].q, keys[i - 1].q);
+    if (d > 1e-6) viol.push(V("hold_jump", `keyframe ${i} (t=${keys[i].t}) has ease 'hold' but q differs from keyframe ${i - 1} by ${d.toFixed(3)} rad; repeat the previous q or use 'cubic'`, { t: keys[i].t, value: round(d, 4), limit: 0 }));
+  }
+
+  const { ts, Q, G, idx } = sampleSegs(segs), N = ts.length, D = ts[N - 1];
+  res.duration = round(D, 3);
+  if (D > MAX_DURATION_S) viol.push(V("too_long", `playback lasts ${D.toFixed(1)} s (incl. transition, loops, speed) > 60 s`, { value: round(D, 2), limit: MAX_DURATION_S, t_play: round(D, 2) }));
+
+  const inTrans = idx.map((i) => segs[i].authored_t0 === null);
+  const cols = JOINTS.map((_, j) => Q.map((q) => q[j]));
+  const Vc = N > 1 ? cols.map((c) => gradient(c, ts)) : cols.map(() => new Array(N).fill(0));
+  const Gv = N > 1 ? gradient(G, ts) : new Array(N).fill(0);
+  const Ac = cols.map((c) => {
+    const a = new Array(N).fill(0);
+    if (N > 2) {
+      for (let k = 1; k < N - 1; k++) a[k] = (c[k + 1] - 2 * c[k] + c[k - 1]) / DT ** 2;
+      a[0] = (c[1] - c[0]) / DT ** 2;
+      a[N - 1] = (c[N - 2] - c[N - 1]) / DT ** 2;
+    }
+    return a;
+  });
+  const maxAbs = (a) => a.reduce((m, x) => Math.max(m, Math.abs(x)), 0);
+  res.max_vel = Vc.map((c) => round(maxAbs(c), 3));
+  res.max_acc = Ac.map((c) => round(maxAbs(c), 3));
+  res.max_grip_vel = round(maxAbs(Gv), 3);
+
+  const authored = (sg, tp) => (sg.authored_t0 === null ? null : round(sg.authored_t0 + (tp - sg.t0) * sg.speed, 3));
+  function addRuns(mask, vals, jn, kind, limit, what) {
+    for (const [a, b] of runs(mask)) {
+      let w = a;
+      for (let k = a + 1; k <= b; k++) if (Math.abs(vals[k]) > Math.abs(vals[w])) w = k;
+      const sg = segs[idx[w]], lim = Array.isArray(limit) ? limit[w] : limit, at = authored(sg, ts[w]);
+      const when = at !== null ? `t=${at}` : `playback ${ts[w].toFixed(2)}s`;
+      viol.push(V(kind, `${jn} ${what} ${vals[w].toFixed(3)} (limit ${lim.toFixed(3)}) at ${when} (${sg.label}, for ${(ts[b] - ts[a]).toFixed(2)}s)`,
+        { t: at, joint: jn, value: round(vals[w], 4), limit: round(lim, 4), t_play: round(ts[w], 2) }));
+    }
+  }
+  for (let j = 0; j < 6; j++) {
+    const c = cols[j], jn = JOINTS[j];
+    const LO = inTrans.map((tr) => (tr ? Math.min(lo[j], startQ[j]) : lo[j]));
+    const HI = inTrans.map((tr) => (tr ? Math.max(hi[j], startQ[j]) : hi[j]));
+    addRuns(c.map((x, k) => x < LO[k] - 1e-9), c, jn, "path_out_of_range", LO, "path below soft limit:");
+    addRuns(c.map((x, k) => x > HI[k] + 1e-9), c, jn, "path_out_of_range", HI, "path above soft limit:");
+    addRuns(Vc[j].map((x) => Math.abs(x) > vcap + 1e-9), Vc[j], jn, "velocity", vcap, "velocity rad/s");
+    addRuns(Ac[j].map((x) => Math.abs(x) > acap + 1e-9), Ac[j], jn, "acceleration", acap, "acceleration rad/s^2");
+  }
+  addRuns(Gv.map((x) => Math.abs(x) > GRIP_VEL_CAP + 1e-9), Gv, "grip", "grip_velocity", GRIP_VEL_CAP, "gripper speed strokes/s");
+
+  // envelope cross-check on the 100 Hz grid (spec 7.9)
+  const nGrid = Math.floor(D * RATE_HZ + 1e-9) + 1;
+  const startOutside = startQ.some((x, j) => x < lo[j] - 1e-9 || x > hi[j] + 1e-9);
+  const mine = new Set(viol.map((x) => `${x.joint}|${["path_out_of_range", "keyframe_out_of_range"].includes(x.kind) ? "range" : x.kind}`));
+  for (const e of checkPath(Q.slice(0, nGrid), vcap, acap, startOutside)) {
+    const k = e.kind === "soft_lower" || e.kind === "soft_upper" ? "range" : e.kind;
+    if (mine.has(`${e.joint}|${k}`)) continue;
+    viol.push(V("envelope_" + e.kind, "envelope cross-check: " + e.msg, { joint: e.joint, value: e.value }));
+  }
+  res.ok = viol.length === 0;
+  return res;
+}
+
+function checkPath(Q, vcap, acap, fromOutside) {
+  const lo = SOFT.map((x) => x[0]), hi = SOFT.map((x) => x[1]);
+  const outOf = (q) => q.map((x, i) => Math.max(lo[i] - x, 0) + Math.max(x - hi[i], 0));
+  const found = new Map();
+  let prev = outOf(Q[0]);
+  Q.forEach((q, k) => {
+    const o = outOf(q);
+    for (let i = 0; i < 6; i++) {
+      if (o[i] <= 1e-9) continue;
+      if (fromOutside && (k === 0 || o[i] <= prev[i] + 1e-9)) continue;
+      const kind = q[i] > hi[i] ? "soft_upper" : "soft_lower";
+      if (!found.has(`${i}|${kind}`)) found.set(`${i}|${kind}`, { joint: JOINTS[i], kind, value: q[i], msg: `${JOINTS[i]} ${kind} ${q[i].toFixed(3)}` });
+    }
+    prev = o;
+  });
+  const out = [...found.values()];
+  if (Q.length >= 2) {
+    const vel = [];
+    for (let k = 0; k + 1 < Q.length; k++) vel.push(Q[k].map((x, i) => (Q[k + 1][i] - x) / DT));
+    for (let i = 0; i < 6; i++) {
+      const m = Math.max(...vel.map((r) => Math.abs(r[i])));
+      if (m > vcap * (1 + 1e-3) + 1e-9) out.push({ joint: JOINTS[i], kind: "velocity", value: m, msg: `${JOINTS[i]} velocity ${m.toFixed(3)} rad/s > cap ${vcap}` });
+    }
+    if (Q.length >= 3) for (let i = 0; i < 6; i++) {
+      let m = 0;
+      for (let k = 0; k + 1 < vel.length; k++) m = Math.max(m, Math.abs(vel[k + 1][i] - vel[k][i]) / DT);
+      if (m > acap * (1 + 1e-2) + 1e-9) out.push({ joint: JOINTS[i], kind: "acceleration", value: m, msg: `${JOINTS[i]} acceleration ${m.toFixed(3)} rad/s^2 > cap ${acap}` });
+    }
+  }
+  return out;
+}
+
+// Samples for drawing (null if the playable cannot be expanded).
+function sample(p) {
+  const caps = CAP_PRESETS[p && p.caps !== undefined ? p.caps : "default"] || CAP_PRESETS.default;
+  const [segs] = timeline(p, caps);
+  return segs.length ? { segs, ...sampleSegs(segs) } : null;
+}
+
+// =====================================================================================
+// 5. Forward kinematics (spec 9): joint origins/axes from the i2rt YAM URDF.
+// =====================================================================================
+const CHAIN = [
+  { xyz: [-2.49777947129965e-7, -9.17402363407408e-13, 0.0679999999995413], rpy: [0, 1.5708, 3.1415963267949], axis: [-1, 0, 0] },
+  { xyz: [-0.0455, -0.0339, -0.02], rpy: [-1.7953e-16, 5.55112e-17, -3.14159], axis: [3.58252e-15, 1, -3.2007e-16] },
+  { xyz: [4.08431e-7, -0.0688, 0.264], rpy: [-2.99502e-14, -1.6015e-14, -3.14159], axis: [4.54273e-15, 1, 1.04275e-14] },
+  { xyz: [-0.0600003, -0.0688, -0.244999], rpy: [2.95536e-14, 8.52374e-14, -2.10585e-14], axis: [0, 1, 0] },
+  { xyz: [-0.0405003, 0.0338995, -0.0739989], rpy: [2.73264e-14, -4.32956e-16, -8.32667e-17], axis: [1, 0, 0] },
+  { xyz: [0.0404996, 2.39858e-7, -0.0356], rpy: [8.83309e-16, -5.88588e-16, 7.69861e-14], axis: [1.46014e-15, 2.40808e-14, -1] },
+];
+const TIP_OFFSET = [0, 0, -0.1];
+const FINGERS = [[-0.0239931, 0.0445119, -0.0566829], [0.0239931, -0.0445119, -0.0566829]];
+const LINK_NAMES = ["link1", "link2", "link3", "link4", "link5", "gripper"];
+
+function mul(A, B) { const o = new Array(16).fill(0); for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) { let s = 0; for (let k = 0; k < 4; k++) s += A[r * 4 + k] * B[k * 4 + c]; o[r * 4 + c] = s; } return o; }
+function originT([x, y, z], [r, p, w]) {
+  const cr = Math.cos(r), sr = Math.sin(r), cp = Math.cos(p), sp = Math.sin(p), cy = Math.cos(w), sy = Math.sin(w);
+  return [cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr, x, sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr, y, -sp, cp * sr, cp * cr, z, 0, 0, 0, 1];
+}
+function rotT(axis, a) {
+  const n = Math.hypot(...axis), [x, y, z] = axis.map((v) => v / n), c = Math.cos(a), s = Math.sin(a), C = 1 - c;
+  return [c + x * x * C, x * y * C - z * s, x * z * C + y * s, 0, y * x * C + z * s, c + y * y * C, y * z * C - x * s, 0, z * x * C - y * s, z * y * C + x * s, c + z * z * C, 0, 0, 0, 0, 1];
+}
+const applyT = (T, v) => [0, 1, 2].map((r) => T[r * 4] * v[0] + T[r * 4 + 1] * v[1] + T[r * 4 + 2] * v[2] + T[r * 4 + 3]);
+function fk(q) {
+  let T = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  const frames = {}, mats = {};
+  CHAIN.forEach((j, i) => { T = mul(mul(T, originT(j.xyz, j.rpy)), rotT(j.axis, q[i])); frames[LINK_NAMES[i]] = [T[3], T[7], T[11]]; mats[LINK_NAMES[i]] = T; });
+  frames.gripper_tip = applyT(T, TIP_OFFSET);
+  frames.tip_left = applyT(T, FINGERS[0]);
+  frames.tip_right = applyT(T, FINGERS[1]);
+  return { frames, gripper: T };
+}
+function geometry(S) {
+  let mz = 9, ml = 9, mx = 9; const fails = [];
+  S.ts.forEach((t, k) => {
+    const f = fk(S.Q[k]).frames, tip = f.gripper_tip;
+    const low = Math.min(...Object.entries(f).filter(([n]) => n !== "link1").map(([, v]) => v[2]));
+    mz = Math.min(mz, tip[2]); ml = Math.min(ml, low); mx = Math.min(mx, tip[0]);
+    if (tip[2] < MIN_TIP_Z || low < MIN_LINK_Z || tip[0] < MIN_TIP_X) fails.push(t);
+  });
+  return { ok: fails.length === 0, min_tip_z: round(mz, 4), min_link_z: round(ml, 4), min_tip_x: round(mx, 4), fails };
+}
+
+// =====================================================================================
+// 6. Offline link codec (spec 13): base64url(zlib(JSON envelope)), no padding.
+// =====================================================================================
+function b64url(bytes) { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+function unb64url(s) { const b = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (s.length % 4)) % 4)); const u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+function encodeLink(playable, prompt) {
+  const env = prompt ? { v: 1, prompt, playable } : { v: 1, playable };
+  return `${VIEWER}#p=${b64url(pako.deflate(new TextEncoder().encode(JSON.stringify(env)), { level: 9 }))}`;
+}
+function decodeLink(link) {
+  let frag = link.includes("#") ? link.slice(link.indexOf("#") + 1) : link;
+  if (frag.startsWith("p=")) frag = frag.slice(2);
+  if (!/^[A-Za-z0-9_-]+$/.test(frag)) throw new Error("not a playable link");
+  const env = JSON.parse(new TextDecoder().decode(pako.inflate(unb64url(frag))));
+  if (!env || env.v !== 1 || typeof env.playable !== "object") throw new Error("unknown playable link format");
+  return env;
+}
+
+// =====================================================================================
+// 7. Scene: procedural arm drawn from the FK frames (no meshes). URDF is z-up; three.js is y-up.
+// =====================================================================================
+const view = document.getElementById("view");
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+view.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+scene.background = new THREE.Color(dark ? 0x1b1a21 : 0xf1ede6);
+const camera = new THREE.PerspectiveCamera(38, 1, 0.01, 20);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x777788, 1.0));
+const sun = new THREE.DirectionalLight(0xffffff, 0.8); sun.position.set(1, 2, 1.5); scene.add(sun);
+const world = new THREE.Group(); world.rotation.x = -Math.PI / 2; scene.add(world); // z-up -> y-up
+
+const table = new THREE.Mesh(new THREE.CircleGeometry(0.6, 64), new THREE.MeshStandardMaterial({ color: dark ? 0x2a2833 : 0xe2d9ca }));
+world.add(table);
+const safety = new THREE.Mesh(new THREE.CircleGeometry(0.5, 64), new THREE.MeshBasicMaterial({ color: 0x2f6fec, transparent: true, opacity: 0.08, side: THREE.DoubleSide, depthWrite: false }));
+safety.position.z = MIN_TIP_Z; world.add(safety);
+world.add(new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0.1, 0, 0.002), 0.2, 0x888888, 0.04, 0.025));
+const matLink = new THREE.MeshStandardMaterial({ color: dark ? 0xd9d6df : 0x2b2a33, roughness: 0.5 });
+const matAccent = new THREE.MeshStandardMaterial({ color: 0xe8601c, roughness: 0.4 });
+const matJoint = new THREE.MeshStandardMaterial({ color: 0x8a8696, roughness: 0.5 });
+const base = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.068, 40), matJoint);
+base.rotation.x = Math.PI / 2; base.position.z = 0.034; world.add(base);
+const RADII = [0.03, 0.026, 0.024, 0.02, 0.018, 0.018];
+const bones = [], balls = [];
+for (let i = 0; i < 6; i++) {
+  const b = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 20), i % 2 ? matAccent : matLink); world.add(b); bones.push(b);
+  const s = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), matJoint); world.add(s); balls.push(s);
+}
+const hand = new THREE.Group(); hand.matrixAutoUpdate = false; world.add(hand);
+const palm = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.075, 0.04), matLink); palm.position.z = -0.035; hand.add(palm);
+const fingerL = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.01, 0.055), matAccent), fingerR = fingerL.clone();
+hand.add(fingerL, fingerR);
+const tipDot = new THREE.Mesh(new THREE.SphereGeometry(0.008, 16, 12), matAccent); world.add(tipDot);
+const trailGeo = new THREE.BufferGeometry();
+const trail = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: 0x2f6fec })); trail.frustumCulled = false; world.add(trail);
+const UP = new THREE.Vector3(0, 1, 0);
+function placeBone(m, a, b, r) {
+  const d = new THREE.Vector3().subVectors(b, a), len = Math.max(d.length(), 1e-4);
+  m.position.copy(a).addScaledVector(d, 0.5); m.scale.set(r, len, r); m.quaternion.setFromUnitVectors(UP, d.normalize());
+}
+function setPose(q, grip) {
+  const { frames, gripper } = fk(q);
+  // chain of points: top of base (link1 origin), then link2..link5, gripper origins
+  const pts = [frames.link1, frames.link2, frames.link3, frames.link4, frames.link5, frames.gripper].map((p) => new THREE.Vector3(...p));
+  for (let i = 0; i < 6; i++) {
+    bones[i].visible = i < 5;
+    if (i < 5) placeBone(bones[i], pts[i], pts[i + 1], RADII[i]);
+    balls[i].position.copy(pts[i]); const r = RADII[i] * 1.15; balls[i].scale.set(r, r, r);
+  }
+  hand.matrix.set(...gripper); hand.matrixWorldNeedsUpdate = true;
+  const open = 0.008 + 0.022 * Math.min(Math.max(grip, 0), 1);
+  fingerL.position.set(0, open, -0.08); fingerR.position.set(0, -open, -0.08);
+  tipDot.position.set(...frames.gripper_tip);
+  return frames;
+}
+// minimal orbit camera
+let az = 0.75, el = 0.5, dist = 1.35;
+const target = new THREE.Vector3(0.1, 0.28, 0);
+function placeCamera() {
+  camera.position.set(target.x + dist * Math.cos(el) * Math.cos(az), target.y + dist * Math.sin(el), target.z + dist * Math.cos(el) * Math.sin(az));
+  camera.lookAt(target);
+}
+let drag = null;
+view.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY }; view.setPointerCapture(e.pointerId); });
+view.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  az += (e.clientX - drag.x) * 0.01; el = Math.min(1.45, Math.max(0.05, el + (e.clientY - drag.y) * 0.01));
+  drag = { x: e.clientX, y: e.clientY }; placeCamera();
+});
+view.addEventListener("pointerup", () => { drag = null; });
+view.addEventListener("wheel", (e) => { e.preventDefault(); dist = Math.min(3, Math.max(0.4, dist * (e.deltaY > 0 ? 1.1 : 0.9))); placeCamera(); }, { passive: false });
+function resize() { const w = view.clientWidth, h = view.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / Math.max(h, 1); camera.updateProjectionMatrix(); }
+new ResizeObserver(resize).observe(view);
+placeCamera(); resize();
+
+// =====================================================================================
+// 8. App state, playback and UI
+// =====================================================================================
+const $ = (id) => document.getElementById(id);
+const state = { playable: null, S: null, result: null, playing: true, t: 0, last: null, frames: 0 };
+const HELLO = { format: "openyam-playable", version: "1.0", name: "hello", notes: "Open the gripper while tilting the hand up, then back to ready.",
+  space: "joint", start: "ready", loop: 1, speed: 1,
+  keyframes: [{ t: 0, q: [0, 0.5, 0.8, 0, 0, 0], grip: 0 }, { t: 1.8, q: [0, 0.5, 0.8, -0.3, 0, 0], grip: 1, ease: "cubic" },
+              { t: 2.8, q: [0, 0.5, 0.8, -0.3, 0, 0], ease: "hold" }, { t: 4.6, q: [0, 0.5, 0.8, 0, 0, 0], grip: 0, ease: "cubic" }] };
+
+function load(p) {
+  state.playable = p; state.t = 0; state.playing = true; $("play").textContent = "Pause";
+  $("json").value = JSON.stringify(p, null, 2);
+  $("qr").innerHTML = ""; $("link").textContent = "";
+  let r;
+  try { r = validate(p); } catch (e) { r = { ok: false, duration: null, violations: [V("schema", String(e))] }; }
+  let S = null;
+  try { S = sample(p); } catch (e) { S = null; }
+  const g = S ? geometry(S) : null;
+  state.S = S; state.result = r; state.geometry = g;
+  const ok = r.ok && g && g.ok;
+  $("status").textContent = r.ok ? (g && g.ok ? "OK" : "OK for the lab validator, but GEOMETRY FAILS") : "REJECTED";
+  $("status").className = ok ? "ok" : "bad";
+  $("summary").textContent = r.duration !== null ? `duration ${r.duration} s, caps ${r.caps}${r.transition ? `, transition from ${r.transition.from} ${r.transition.duration} s` : ""}` : "";
+  const ul = $("violations"); ul.innerHTML = "";
+  for (const v of r.violations) { const li = document.createElement("li"); li.textContent = `[${v.kind}] ${v.msg}`; li.dataset.kind = v.kind; ul.appendChild(li); }
+  if (g && !g.ok) { const li = document.createElement("li"); li.dataset.kind = "geometry"; li.textContent = `[geometry] ${g.fails.length} samples break tip z >= ${MIN_TIP_Z} m / links z >= ${MIN_LINK_Z} m / tip x >= ${MIN_TIP_X} m (first at playback ${g.fails[0].toFixed(2)} s)`; ul.appendChild(li); }
+  $("stats").innerHTML = r.max_vel ? `<table><tr><th></th>${JOINTS.map((j) => `<th>${j}</th>`).join("")}</tr>` +
+    `<tr><td>max |vel|</td>${r.max_vel.map((x) => `<td>${x.toFixed(2)}</td>`).join("")}</tr>` +
+    `<tr><td>max |acc|</td>${r.max_acc.map((x) => `<td>${x.toFixed(2)}</td>`).join("")}</tr></table>` +
+    (g ? `<div>min tip z ${g.min_tip_z} m, min link z ${g.min_link_z} m, min tip x ${g.min_tip_x} m</div>` : "") : "";
+  if (S) {
+    const pts = []; for (let k = 0; k < S.ts.length; k += 2) pts.push(new THREE.Vector3(...fk(S.Q[k]).frames.gripper_tip));
+    trailGeo.setFromPoints(pts); trailGeo.computeBoundingSphere();
+  } else trailGeo.setFromPoints([]);
+  render();
+  return { result: r, geometry: g };
+}
+function duration() { return state.S ? state.S.ts[state.S.ts.length - 1] : 0; }
+function render() {
+  let q = POSES.ready, grip = 0;
+  if (state.S) { const e = evalAt(state.S.segs, state.t); q = e.q; grip = e.grip; }
+  const f = setPose(q, grip), tip = f.gripper_tip;
+  $("tip").textContent = `(${tip.map((v) => v.toFixed(3)).join(", ")})`;
+  $("tipz").textContent = `${tip[2].toFixed(3)} m`;
+  $("q").textContent = q.map((v) => v.toFixed(2)).join(" ");
+  $("time").textContent = `${state.t.toFixed(2)} / ${duration().toFixed(2)} s`;
+  $("scrub").value = String(duration() ? Math.round((state.t / duration()) * 1000) : 0);
+  renderer.render(scene, camera);
+}
+function tick(now) {
+  if (state.last !== null && state.playing && state.S) {
+    state.t += (now - state.last) / 1000;
+    if (state.t > duration()) state.t = 0; // loop the preview
+  }
+  state.last = now; state.frames++;
+  render();
+  requestAnimationFrame(tick);
+}
+$("play").onclick = () => { state.playing = !state.playing; $("play").textContent = state.playing ? "Pause" : "Play"; };
+$("scrub").oninput = (e) => { state.playing = false; $("play").textContent = "Play"; state.t = (Number(e.target.value) / 1000) * duration(); render(); };
+$("apply").onclick = () => { try { load(JSON.parse($("json").value)); } catch (e) { $("status").textContent = "JSON error: " + e.message; $("status").className = "bad"; } };
+$("file").onchange = async (e) => { const f = e.target.files[0]; if (f) { $("json").value = await f.text(); $("apply").onclick(); } };
+$("download").onclick = () => {
+  const p = state.playable; if (!p) return;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(p, null, 2) + "\n"], { type: "application/json" }));
+  a.download = `${p.name || "playable"}.json`; a.click();
+};
+$("makelink").onclick = () => {
+  const p = state.playable; if (!p) return;
+  const link = encodeLink(p);
+  $("link").textContent = `${link}  (${link.length} characters)`;
+  try {
+    const qr = qrcode(0, "L"); qr.addData(link); qr.make();
+    $("qr").innerHTML = qr.createImgTag(4, 16);
+    $("qr").dataset.version = String((qr.getModuleCount() - 17) / 4);
+  } catch (e) { $("qr").textContent = "Too long for one QR code (" + link.length + " characters): share the JSON file instead, or shorten it (spec 13.4)."; }
+};
+window.openyam = { validate, sample, fk, geometry, encodeLink, decodeLink, load, state, parse, timeline, evalAt };
+
+// start: a #p=<data> link if present, else the built-in example
+try { const h = location.hash.slice(1); load(h.startsWith("p=") ? decodeLink(h).playable : HELLO); }
+catch (e) { load(HELLO); $("status").textContent = "Could not read the link (" + e.message + "); showing an example."; }
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenYAM playables</title>
+<meta name="description" content="Point your own AI assistant at the OpenYAM playable spec, ask for a robot-arm move, check it in the viewer, and bring the QR code to the arm at Edge City.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f1">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14131a">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="alternate" type="text/plain" href="llms.txt" title="llms.txt">
+<script>try{var t=localStorage.getItem("theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body class="landing">
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+  <header class="top">
+    <a href="./" class="brand" aria-current="page">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="10" fill="var(--accent)"/><path d="M9 27h12" stroke="var(--accent-ink)" stroke-width="3" stroke-linecap="round"/><path d="M15 26V19l7-8 4 3" fill="none" stroke="var(--accent-ink)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15" cy="19" r="2.2" fill="var(--accent-ink)"/><circle cx="22" cy="11" r="2.2" fill="var(--accent-ink)"/></svg>
+      <span>OpenYAM playables<small>bring your own AI</small></span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="viewer.html">Viewer</a>
+      <a href="spec/v1.md">Spec</a>
+      <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle light or dark theme" title="Light / dark">
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 3a7 7 0 0 1 0 14z" fill="currentColor"/></svg>
+      </button>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero landing-hero">
+      <p class="eyebrow">A six-joint robot arm · Edge City lab</p>
+      <h1>Design a robot move with <em>your own AI</em>. Bring it to the arm.</h1>
+      <p class="lede">Point your AI assistant at our spec, ask for a move, check it in the viewer, and bring the QR code to the OpenYAM arm at Edge City. No sign-up, no keys: this site is just the spec, a viewer and a QR maker.</p>
+      <div class="row hero-actions">
+        <a class="btn btn-primary" href="#prompt">Copy the prompt</a>
+        <a class="btn btn-ghost" href="viewer.html">Open the viewer</a>
+      </div>
+    </section>
+
+    <ol class="flow" aria-label="How it works">
+      <li><span class="n">1</span><b>Point your AI at the spec</b><span>Any assistant that can read a web page: Claude, ChatGPT, Gemini, a local model.</span></li>
+      <li><span class="n">2</span><b>Ask for a move</b><span>“A slow bow”, “wave hello twice”, “dance to 120 bpm”. It writes a playable: keyframes of six joint angles.</span></li>
+      <li><span class="n">3</span><b>Check it in the viewer</b><span>See it move in 3D, run the same checks as the lab, fix what's red.</span></li>
+      <li><span class="n">4</span><b>Bring the QR to the arm</b><span>Show it at the Edge City lab. A person previews it and presses Play.</span></li>
+    </ol>
+
+    <section class="card prompt-card" id="prompt" aria-labelledby="prompt-title">
+      <h2 id="prompt-title">The prompt</h2>
+      <p class="muted">Type your idea, copy, and paste into your assistant.</p>
+      <label for="idea" class="prompt-label">Your idea</label>
+      <input id="idea" class="idea" type="text" maxlength="300" autocomplete="off" placeholder="e.g. a shy wave that ends with a little bow">
+      <div class="promptbox">
+        <p id="prompt-text" class="prompt-text">Read https://nhajela.github.io/openyam-playground/spec/v1.md and help me design a playable for the OpenYAM arm: <span id="idea-slot" class="slot">&lt;your idea&gt;</span>. Build the simulator from the spec so I can see it, validate it, then give me the JSON and an offline viewer link.</p>
+        <button id="copy-prompt" type="button" class="btn btn-primary">Copy prompt</button>
+      </div>
+      <p class="muted small">Assistants that can't run code can still write the JSON; paste it into the <a href="viewer.html">viewer</a> to see and check it.</p>
+    </section>
+
+    <section class="links" aria-labelledby="links-title">
+      <h2 id="links-title" class="sr-only">Links</h2>
+      <a class="tile link-tile" href="spec/v1.md"><b>Spec v1</b><small>The format, the limits, how validation works. Pinned: never changes meaning.</small></a>
+      <a class="tile link-tile" href="spec/latest.md"><b>Latest spec</b><small>Always the newest 1.x text.</small></a>
+      <a class="tile link-tile" href="llms.txt"><b>llms.txt</b><small>A short map of this site for AI assistants.</small></a>
+      <a class="tile link-tile" href="viewer.html"><b>Viewer</b><small>Paste JSON or a link: 3D replay, validator, QR.</small></a>
+      <a class="tile link-tile" href="viewer.html#examples-section" id="examples-link"><b>Examples</b><small>Nod, wave, a beat dance: load one in the viewer.</small></a>
+      <a class="tile link-tile" href="https://github.com/nhajela/openyam-playground"><b>GitHub</b><small>Source for this site, the validator port and the playground app.</small></a>
+    </section>
+
+    <div class="two">
+      <section class="card" aria-labelledby="lab-title">
+        <h2 id="lab-title">What happens at the lab</h2>
+        <ol class="steps">
+          <li>The station reads your QR (or JSON file) and checks the version.</li>
+          <li>It re-validates the motion with the lab's own Python validator: joint limits, speed and acceleration caps, a 60 s limit, and where the gripper tip goes.</li>
+          <li>It previews the motion on screen for the operator.</li>
+          <li>A human clears the space around the arm and presses Play. They may refuse anything, for any reason.</li>
+        </ol>
+        <p class="muted small">This viewer runs a faithful port of that validator, so “passes here” should mean “passes there”, but the lab's check is the one that counts.</p>
+      </section>
+      <section class="card" aria-labelledby="ver-title">
+        <h2 id="ver-title">Versioning promise</h2>
+        <ul class="steps">
+          <li>Every playable says <code>"format": "openyam-playable"</code> and <code>"version": "1.0"</code>.</li>
+          <li>Any <b>1.x</b> is accepted. Minor versions only add optional fields; unknown fields are ignored.</li>
+          <li>A different major version (2.0, …) is refused rather than guessed at.</li>
+          <li>No version at all? Read as a legacy 1.0 playable, with a note.</li>
+          <li>Optional <code>"caps"</code>: <code>"default"</code> (0.3 rad/s, 1.0 rad/s²) or <code>"dance"</code> (0.6 rad/s, 2.0 rad/s²).</li>
+        </ul>
+        <p class="muted small"><a href="spec/v1.md">spec/v1.md</a> is frozen; <a href="spec/latest.md">spec/latest.md</a> tracks the newest 1.x.</p>
+      </section>
+    </div>
+  </main>
+
+  <footer class="foot">
+    OpenYAM playables. A static site: no server, no accounts, nothing you paste leaves your browser.
+    <a href="viewer.html">Viewer</a> · <a href="spec/v1.md">Spec v1</a> · <a href="llms.txt">llms.txt</a> · <a href="https://github.com/nhajela/openyam-playground">GitHub</a>
+  </footer>
+</div>
+<div id="sr-status" class="sr-only" role="status" aria-live="polite"></div>
+<script src="assets/landing.js" defer></script>
+</body>
+</html>

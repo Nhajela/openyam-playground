@@ -27,10 +27,18 @@ function fromB64Url(s: string): Uint8Array {
   return out;
 }
 
-/** Keep only what the arm needs (motion + name/notes/prompt) to keep the QR small. */
+/**
+ * Keep only what the arm needs (motion + name/notes/prompt, plus the format/version marker and
+ * the caps preset when present, since they change how it is validated) to keep the QR small.
+ */
 export function compactPlayable(p: Playable): Playable {
-  const { name, notes, space, start, keyframes, loop, speed } = p;
-  return { name, ...(notes ? { notes } : {}), space, start, keyframes, loop, speed };
+  const { name, notes, space, start, keyframes, loop, speed, format, version, caps } = p;
+  return {
+    ...(format !== undefined ? { format } : {}),
+    ...(version !== undefined ? { version } : {}),
+    name, ...(notes ? { notes } : {}), space, start, keyframes, loop, speed,
+    ...(caps !== undefined ? { caps } : {}),
+  };
 }
 
 export function encodeLocal(share: LocalShare): string {

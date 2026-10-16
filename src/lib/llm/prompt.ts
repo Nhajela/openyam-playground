@@ -69,7 +69,7 @@ Reference poses:
 ${refs}
 How each joint moves the tip, starting from ready:
 ${effects}
-  So: to lower the hand / bow / reach toward the table, INCREASE j2 (and tilt j4 positive);
+  So: to lower the hand / bow / reach toward the table, INCREASE j2 and tilt the hand down with NEGATIVE j4 (+j4 tilts the hand up);
   to raise the hand / stand tall, INCREASE j3 (and keep j2 modest). Increasing j2 and j3 together
   mostly lifts the tip up and back, it does not bow.
 Workspace rules (checked on the whole path): the tip must stay above z=${TABLE_Z_MIN} m (table safety

@@ -1,0 +1,17 @@
+{
+  "format": "openyam-playable",
+  "version": "1.0",
+  "name": "bow",
+  "notes": "A real bow: lean the shoulder forward (j2 up), bend the hand down (j4 negative), hold, rise. The tip goes forward and DOWN from z 0.43 m to 0.21 m.",
+  "author": "OpenYAM spec",
+  "space": "joint",
+  "start": "ready",
+  "loop": 1,
+  "speed": 1,
+  "keyframes": [
+    {"t": 0, "q": [0, 0.5, 0.8, 0, 0, 0], "grip": 0},
+    {"t": 3.4, "q": [0, 1.1, 0.9, -0.6, 0, 0], "ease": "cubic"},
+    {"t": 5, "q": [0, 1.1, 0.9, -0.6, 0, 0], "ease": "hold"},
+    {"t": 8.4, "q": [0, 0.5, 0.8, 0, 0, 0], "ease": "cubic"}
+  ]
+}

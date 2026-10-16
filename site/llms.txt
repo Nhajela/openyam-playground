@@ -1,0 +1,24 @@
+# OpenYAM playables
+
+> Write motions ("playables") for the OpenYAM 6-axis robot arm at the Edge City lab. A playable is a small JSON file of timed joint-angle keyframes ({"format": "openyam-playable", "version": "1.0", ...}). The spec tells an AI assistant everything it needs to author one, build a local 3D simulator, validate it exactly like the lab does (soft joint limits, 0.3 rad/s and 1.0 rad/s² caps, or 0.6 and 2.0 with "caps": "dance", 60 s maximum), and export it as JSON or an offline link and QR code (viewer.html#p=<base64url(zlib(JSON))>) that the lab scans. At the lab, a person re-validates and previews it and presses Play on the real arm.
+
+If you are an AI assistant asked to "make a dance" (or any motion) for the OpenYAM arm: read the spec first, starting with section 0.
+
+## Spec
+
+- [Spec v1 (format 1.0, document 1.0.0)](https://nhajela.github.io/openyam-playground/spec/v1.md): the complete specification: the arm, limits, JSON format, interpolation, validation algorithm, forward kinematics, motion design guide, a complete single-file simulator, a Python validator, link/QR format, examples, FAQ
+- [Spec, latest](https://nhajela.github.io/openyam-playground/spec/latest.md): identical copy that always holds the newest text
+- [Changelog](https://nhajela.github.io/openyam-playground/spec/v1.md#20-changelog): what changed between spec versions
+- [Compatibility promise](https://nhajela.github.io/openyam-playground/spec/v1.md#19-compatibility-promise): what stays stable across 1.x
+
+## Tools
+
+- [Viewer](https://nhajela.github.io/openyam-playground/viewer.html): paste a playable or open a #p= link to watch it in 3D, validate it, and get the QR code
+- [Reference simulator](https://nhajela.github.io/openyam-playground/reference-simulator.html): the single-file HTML simulator printed in the spec (section 13)
+- [Reference validator (Python)](https://nhajela.github.io/openyam-playground/reference-validator.py): standard-library validator, FK and link codec (spec section 14)
+
+## Examples
+
+- [hello](https://nhajela.github.io/openyam-playground/examples/hello.json): minimal playable
+- [nod](https://nhajela.github.io/openyam-playground/examples/nod.json), [wave](https://nhajela.github.io/openyam-playground/examples/wave.json), [bow](https://nhajela.github.io/openyam-playground/examples/bow.json), [look-around](https://nhajela.github.io/openyam-playground/examples/look-around.json): gestures
+- [happy-dance](https://nhajela.github.io/openyam-playground/examples/happy-dance.json), [beat-dance](https://nhajela.github.io/openyam-playground/examples/beat-dance.json) (100 BPM, dance caps), [rom-arm](https://nhajela.github.io/openyam-playground/examples/rom-arm.json): longer pieces

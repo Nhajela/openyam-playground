@@ -81,6 +81,14 @@ cases += [
     mut("bad-start", lambda p: p.update(start="sideways"), "nod"),
     mut("bad-grip", set_kf(2, grip=1.5), "nod"),
     mut("j1-sweep-fast", chain(set_q(2, 0, 2.9), set_q(4, 0, -2.4)), "look-around"),
+    mut("dance-default-caps", lambda p: p.pop("caps"), "beat-dance"),
+    mut("caps-unknown", lambda p: p.update(caps="turbo"), "nod"),
+    mut("nod-dance-caps", lambda p: p.update(caps="dance"), "nod"),
+    mut("versioned-1.3", lambda p: p.update(format="openyam-playable", version="1.3", extra={"x": 1}), "wave"),
+    mut("version-2.0", lambda p: p.update(format="openyam-playable", version="2.0"), "wave"),
+    mut("version-no-format", lambda p: p.update(version="1.0"), "wave"),
+    mut("version-bad", lambda p: p.update(format="openyam-playable", version="1"), "wave"),
+    mut("format-other", lambda p: p.update(format="other", version="1.0"), "wave"),
 ]
 
 valid = []

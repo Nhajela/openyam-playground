@@ -8,3 +8,9 @@ next-env.d.ts
 .env*.local
 npm-debug.log*
 .vercel
+
+# static site build output (npm run build:site; CI builds it for GitHub Pages)
+site/assets/app.js
+site/assets/landing.js
+site/assets/site.css
+__pycache__/

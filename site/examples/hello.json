@@ -1,0 +1,17 @@
+{
+  "format": "openyam-playable",
+  "version": "1.0",
+  "name": "hello",
+  "notes": "Smallest useful playable: open the gripper while tilting the hand up, then come back to ready.",
+  "author": "OpenYAM spec",
+  "space": "joint",
+  "start": "ready",
+  "loop": 1,
+  "speed": 1,
+  "keyframes": [
+    {"t": 0, "q": [0, 0.5, 0.8, 0, 0, 0], "grip": 0},
+    {"t": 1.8, "q": [0, 0.5, 0.8, -0.3, 0, 0], "grip": 1, "ease": "cubic"},
+    {"t": 2.8, "q": [0, 0.5, 0.8, -0.3, 0, 0], "ease": "hold"},
+    {"t": 4.6, "q": [0, 0.5, 0.8, 0, 0, 0], "grip": 0, "ease": "cubic"}
+  ]
+}

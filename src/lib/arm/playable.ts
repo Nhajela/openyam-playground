@@ -14,6 +14,7 @@
  *   (central differences) and acceleration (second differences) under the caps.
  */
 import { ENVELOPE, EPS, JOINTS, fmtG, round } from "./envelope";
+import { checkFormat } from "./format";
 
 export const RATE_HZ = 100;
 export const MAX_DURATION_S = 60;
@@ -334,8 +335,57 @@ function authoredT(sg: Segment, tPlay: number): number | null {
   return round(sg.authoredT0 + (tPlay - sg.t0) * sg.speed, 3);
 }
 
-/** Check a playable against the soft envelope, caps, start pose, duration and t order. */
+/**
+ * Named cap presets a playable may declare with "caps": [vel rad/s, acc rad/s^2]
+ * (armctl/playable.py CAP_PRESETS). null = the envelope defaults (0.3 / 1.0).
+ */
+export const CAP_PRESETS: Record<string, [number, number] | null> = { default: null, dance: [0.6, 2.0] };
+
+/** The cap preset a playable declares ("default" when absent); null if it names an unknown one. */
+export function capPreset(playable: Playable): string | null {
+  const c = (playable as { caps?: unknown }).caps ?? "default";
+  return typeof c === "string" && Object.prototype.hasOwnProperty.call(CAP_PRESETS, c) ? c : null;
+}
+
+/**
+ * Run fn with the velocity/acceleration caps of the playable's preset swapped into ENVELOPE
+ * (like armctl's set_envelope during validate()); this also sizes the start transition.
+ */
+export function withCaps<T>(playable: Playable, fn: () => T): T {
+  const preset = capPreset(playable);
+  const caps = preset ? CAP_PRESETS[preset] : null;
+  if (!caps) return fn();
+  const vel = [...ENVELOPE.velCap], acc = [...ENVELOPE.accCap];
+  ENVELOPE.velCap.fill(caps[0]);
+  ENVELOPE.accCap.fill(caps[1]);
+  try {
+    return fn();
+  } finally {
+    vel.forEach((x, i) => { ENVELOPE.velCap[i] = x; });
+    acc.forEach((x, i) => { ENVELOPE.accCap[i] = x; });
+  }
+}
+
+/**
+ * Validate like armctl/playable.py validate(): first the format/version gate (any 1.x, or
+ * legacy with neither field), then with the cap preset the playable declares ("caps").
+ */
 export function validate(playable: Playable): ValidationResult {
+  const fv = checkFormat(playable);
+  if (fv.status === "refused" && playable && typeof playable === "object" && !Array.isArray(playable)) {
+    return { ok: false, duration: null, max_vel: null, max_acc: null, transition: null, envelope: ENVELOPE.source,
+      violations: [{ ...schemaViolation(fv.msg, null, "version"), limit: null, value: null }] };
+  }
+  if (playable && typeof playable === "object" && capPreset(playable) === null) {
+    const c = (playable as { caps?: unknown }).caps;
+    return { ok: false, duration: null, max_vel: null, max_acc: null, transition: null, envelope: ENVELOPE.source,
+      violations: [{ ...schemaViolation(`unknown caps preset ${pyRepr(c)}`), value: null }] };
+  }
+  return withCaps(playable, () => validateDefault(playable));
+}
+
+/** Check a playable against the soft envelope, caps, start pose, duration and t order. */
+function validateDefault(playable: Playable): ValidationResult {
   let tl;
   try {
     tl = timeline(playable);

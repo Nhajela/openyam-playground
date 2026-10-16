@@ -1,5 +1,5 @@
 import { checkGeometry, type GeometryReport } from "./kinematics";
-import { sample, validate, type Playable, type ValidationResult } from "./playable";
+import { sample, validate, withCaps, type Playable, type ValidationResult } from "./playable";
 
 export interface CheckResult {
   ok: boolean;
@@ -13,7 +13,7 @@ export function checkPlayable(p: Playable): CheckResult {
   let geometry: GeometryReport | null = null;
   if (validation.duration !== null) {
     try {
-      geometry = checkGeometry(sample(p), p.keyframes);
+      geometry = checkGeometry(withCaps(p, () => sample(p)), p.keyframes);
     } catch {
       geometry = null;
     }

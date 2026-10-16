@@ -1,0 +1,27 @@
+{
+  "format": "openyam-playable",
+  "version": "1.0",
+  "name": "look-around",
+  "notes": "Turn the base left and right, tilting the wrist to peek, like scanning the room.",
+  "author": "OpenYAM lab",
+  "created": "2026-10-16T14:47:28+05:30",
+  "space": "joint",
+  "start": "ready",
+  "loop": 1,
+  "speed": 1.0,
+  "keyframes": [
+    {"t": 0, "q": [0, 0.5, 0.8, 0, 0, 0], "grip": 0, "ease": "cubic"},
+    {"t": 1.2, "q": [0, 0.6, 1, -0.15, 0, 0], "ease": "cubic"},
+    {"t": 3.9, "q": [0.5, 0.6, 1, -0.1, 0.15, 0], "ease": "cubic"},
+    {"t": 4.5, "q": [0.5, 0.6, 1, -0.1, 0.15, 0], "ease": "hold"},
+    {"t": 5.7, "q": [0.5, 0.65, 1.05, -0.3, 0.15, 0], "ease": "cubic"},
+    {"t": 6.3, "q": [0.5, 0.65, 1.05, -0.3, 0.15, 0], "ease": "hold"},
+    {"t": 11.7, "q": [-0.5, 0.6, 1, -0.1, -0.15, 0], "ease": "cubic"},
+    {"t": 12.3, "q": [-0.5, 0.6, 1, -0.1, -0.15, 0], "ease": "hold"},
+    {"t": 13.5, "q": [-0.5, 0.65, 1.05, -0.3, -0.15, 0], "ease": "cubic"},
+    {"t": 14.1, "q": [-0.5, 0.65, 1.05, -0.3, -0.15, 0], "ease": "hold"},
+    {"t": 16.8, "q": [0, 0.6, 1, -0.15, 0, 0], "ease": "cubic"},
+    {"t": 17.4, "q": [0, 0.6, 1, -0.15, 0, 0], "ease": "hold"},
+    {"t": 18.6, "q": [0, 0.5, 0.8, 0, 0, 0], "ease": "cubic"}
+  ]
+}

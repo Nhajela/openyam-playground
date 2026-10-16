@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Not found · OpenYAM playables</title>
+<meta name="robots" content="noindex">
+<script>
+// GitHub Pages serves this file for any missing path, at any depth, so work out the site root
+// (project pages live under /<repo>/) instead of trusting relative URLs.
+(function () {
+  var seg = location.pathname.split("/").filter(Boolean);
+  var base = /\.github\.io$/.test(location.hostname) && seg.length ? "/" + seg[0] + "/" : "/";
+  window.__BASE__ = base;
+  // A playground offline link (/p/local#<payload>) opened on this site: show it in the viewer.
+  if (/\/p\/local\/?$/.test(location.pathname) && /^#[A-Za-z0-9_-]{16,}$/.test(location.hash)) {
+    location.replace(base + "viewer.html#p=" + location.hash.slice(1));
+  }
+  try { var t = localStorage.getItem("theme"); if (t === "dark" || t === "light") document.documentElement.dataset.theme = t; } catch (e) {}
+})();
+</script>
+<style>
+  :root { --bg: #fbf7f1; --ink: #1c1a23; --muted: #676373; --accent: #f2621f; --accent-ink: #fff; --line: #e6dfd4; --surface: #fff; color-scheme: light; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #14131a; --ink: #f3f1ee; --muted: #a7a3b3; --accent: #ff7d3d; --accent-ink: #1a0d05; --line: #322f3d; --surface: #1d1c25; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #14131a; --ink: #f3f1ee; --muted: #a7a3b3; --accent: #ff7d3d; --accent-ink: #1a0d05; --line: #322f3d; --surface: #1d1c25; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.5 ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; }
+  main { max-width: 560px; margin: 12vh auto 0; padding: 0 16px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 24px; }
+  h1 { font-size: 32px; letter-spacing: -0.03em; margin: 10px 0 6px; }
+  p { color: var(--muted); margin: 0 0 18px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  a.btn { display: inline-flex; padding: 12px 18px; border-radius: 14px; font-weight: 800; text-decoration: none; color: var(--ink); border: 1px solid var(--line); }
+  a.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  a:focus-visible { outline: 3px solid #2f6fec; outline-offset: 2px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <svg width="40" height="40" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="10" fill="var(--accent)"/><path d="M9 27h12" stroke="var(--accent-ink)" stroke-width="3" stroke-linecap="round"/><path d="M15 26V19l7-8 4 3" fill="none" stroke="var(--accent-ink)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15" cy="19" r="2.2" fill="var(--accent-ink)"/><circle cx="22" cy="11" r="2.2" fill="var(--accent-ink)"/></svg>
+    <h1>The arm can't reach that page.</h1>
+    <p>Nothing lives at <code id="path"></code>. Try the home page, the viewer, or the spec.</p>
+    <div class="row">
+      <a class="btn primary" data-href="">Home</a>
+      <a class="btn" data-href="viewer.html">Viewer</a>
+      <a class="btn" data-href="spec/v1.md">Spec v1</a>
+    </div>
+  </div>
+</main>
+<script>
+  document.getElementById("path").textContent = location.pathname;
+  document.querySelectorAll("a[data-href]").forEach(function (a) { a.href = window.__BASE__ + a.getAttribute("data-href"); });
+</script>
+</body>
+</html>

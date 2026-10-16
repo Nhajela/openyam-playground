@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playable viewer · OpenYAM playables</title>
+<meta name="description" content="Check an OpenYAM robot-arm playable in your browser: version, lab validator, 3D replay, joint ranges, JSON export and a QR code to bring to the arm.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbf7f1">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14131a">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<script>try{var t=localStorage.getItem("theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+  <header class="top">
+    <a href="./" class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="10" fill="var(--accent)"/><path d="M9 27h12" stroke="var(--accent-ink)" stroke-width="3" stroke-linecap="round"/><path d="M15 26V19l7-8 4 3" fill="none" stroke="var(--accent-ink)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="15" cy="19" r="2.2" fill="var(--accent-ink)"/><circle cx="22" cy="11" r="2.2" fill="var(--accent-ink)"/></svg>
+      <span>OpenYAM playables<small>viewer &amp; validator</small></span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="./">Home</a>
+      <a href="spec/v1.md">Spec</a>
+      <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle light or dark theme" title="Light / dark">
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 3a7 7 0 0 1 0 14z" fill="currentColor"/></svg>
+      </button>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="card load" id="examples-section" aria-labelledby="load-title">
+      <h1 id="load-title" class="page-title">Check a playable</h1>
+      <p class="lede">Paste the JSON your AI gave you, drop a <code>.json</code> file, open a share link, or try an example. Everything runs in your browser; nothing is uploaded.</p>
+      <div class="drop" id="drop">
+        <label for="src" class="sr-only">Playable JSON or a share link</label>
+        <textarea id="src" class="prompt code" spellcheck="false" autocomplete="off" placeholder='{"format": "openyam-playable", "version": "1.0", "name": "wave", ...}&#10;or a link: .../viewer.html#p=...  or  .../p/local#...'></textarea>
+        <div class="drop-hint" aria-hidden="true">or drop a .json file here</div>
+      </div>
+      <div class="row load-actions">
+        <button id="check" type="button" class="btn btn-primary">Check it</button>
+        <label class="btn btn-ghost file-btn">Open a .json file<input type="file" id="file" accept=".json,application/json"></label>
+        <span class="muted small kbd-hint">Ctrl/⌘ + Enter to check</span>
+      </div>
+      <div id="examples" class="chips" aria-label="Example playables"><span class="muted small">Loading examples…</span></div>
+      <div id="load-error" class="error" role="alert" hidden></div>
+    </section>
+
+    <div id="result" class="grid result" hidden>
+      <section class="card" aria-labelledby="pname">
+        <div class="title-row">
+          <h2 id="pname" class="result-title"></h2>
+          <div id="fmt-badges" class="badges"></div>
+        </div>
+        <p id="pnotes" class="notes" hidden></p>
+        <p class="muted small"><span id="psource"></span> <span id="fmt-msg"></span></p>
+        <div class="viewer" id="stage" role="img" aria-label="3D preview of the robot arm playing the motion">
+          <div class="tip-readout" id="tip" aria-hidden="true"></div>
+          <div class="stage-msg" id="stage-msg"></div>
+          <div class="hint">drag to orbit</div>
+        </div>
+        <div class="controls">
+          <button class="play" id="play" type="button" aria-label="Play"></button>
+          <input class="scrub" id="scrub" type="range" min="0" max="1000" step="1" value="0" aria-label="Scrub through the motion">
+          <span class="time" id="time" aria-live="off">0.0 / 0.0 s</span>
+        </div>
+        <div class="row controls-2">
+          <label class="small">Speed
+            <select id="rate" class="select">
+              <option value="0.25">0.25×</option>
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="2">2×</option>
+            </select>
+          </label>
+          <label class="small check"><input type="checkbox" id="repeat" checked> Repeat</label>
+          <span class="muted small">Preview speed only; the arm plays at the file's own speed.</span>
+        </div>
+
+        <h3 class="sub">Joint ranges</h3>
+        <p class="muted small legend"><span class="sw soft"></span> soft limits (allowed) <span class="sw used"></span> range this motion uses <span class="sw mark"></span> now</p>
+        <div id="joints" class="joints"></div>
+      </section>
+
+      <section class="card sticky" aria-labelledby="verdict-title">
+        <h2 id="verdict-title" class="sr-only">Verdict</h2>
+        <div id="verdict" class="verdict" aria-live="polite"></div>
+        <ul id="checks" class="checks"></ul>
+        <div id="stats" class="stats"></div>
+        <div id="violations-wrap" hidden>
+          <h3 class="sub">Problems</h3>
+          <ol id="violations" class="violations"></ol>
+        </div>
+
+        <h3 class="sub" id="export">Export</h3>
+        <div class="row export-actions">
+          <a id="download" class="btn btn-ghost" href="#" download="playable.json">Download JSON</a>
+          <button id="copy-json" type="button" class="btn btn-ghost">Copy JSON</button>
+          <button id="copy-link" type="button" class="btn btn-ghost">Copy share link</button>
+        </div>
+        <div class="share">
+          <div class="qr" id="qr-box"><canvas id="qr" role="img" aria-label="QR code of the share link (the motion is inside the link)"></canvas></div>
+          <div>
+            <span class="badge neutral">offline link: the motion is inside the URL</span>
+            <p class="muted small" id="qr-size"></p>
+            <div id="qr-warn" class="warnbox" hidden></div>
+            <div class="linkbox"><span id="share-link"></span></div>
+          </div>
+        </div>
+        <details class="json-details">
+          <summary>Show JSON</summary>
+          <pre class="json" id="json-out"></pre>
+        </details>
+
+        <h3 class="sub">At the arm</h3>
+        <ol class="steps small">
+          <li>Bring the QR (or the JSON file) to the OpenYAM arm at Edge City.</li>
+          <li>The station decodes it and re-checks it with the lab's own validator.</li>
+          <li>An operator previews it, clears the space, and presses Play. They may refuse anything that looks unsafe.</li>
+        </ol>
+      </section>
+    </div>
+  </main>
+
+  <footer class="foot">
+    OpenYAM playables. Validation here is a TypeScript port of the lab's Python validator; the lab re-checks every playable before anything moves.
+    <a href="./">Home</a> · <a href="spec/v1.md">Spec v1</a> · <a href="llms.txt">llms.txt</a> · <a href="https://github.com/nhajela/openyam-playground">GitHub</a>
+  </footer>
+</div>
+<div id="sr-status" class="sr-only" role="status" aria-live="polite"></div>
+<noscript><p class="wrap">The viewer needs JavaScript. The spec is plain text: <a href="spec/v1.md">spec/v1.md</a>.</p></noscript>
+<script src="assets/app.js" defer></script>
+</body>
+</html>
