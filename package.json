@@ -1,0 +1,38 @@
+{
+  "name": "openyam-playground",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Type English, get a validated robot-arm motion (a playable), watch it in 3D, take a QR code to the real OpenYAM arm.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.18"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "migrate": "node scripts/migrate.mjs",
+    "reference": "/home/naman/openyam-robot-arm/.venv/bin/python scripts/make_reference.py"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "fflate": "^0.8.2",
+    "next": "^14.2.35",
+    "postgres": "^3.4.4",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.50",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/three": "^0.160.0",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}
